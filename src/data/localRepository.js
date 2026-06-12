@@ -9,14 +9,18 @@ import { newId } from './repository.js';
 const ENTRIES_KEY = 'swish.entries.v1';
 const PROJECTS_KEY = 'swish.projects.v1';
 const TAGS_KEY = 'swish.tags.v1';
+const WORKSPACES_KEY = 'swish.workspaces.v1';
+const ACTIVE_KEY = 'swish.activeWorkspace.v1';
+
+const DEFAULT_WORKSPACE = { id: 'w_default', name: 'My Workspace' };
 
 const DEFAULT_PROJECTS = [
-  { id: 'p_focus', name: 'Deep Work', color: '#6c5ce7' },
+  { id: 'p_focus', workspaceId: DEFAULT_WORKSPACE.id, name: 'Deep Work', color: '#6c5ce7' },
 ];
 
 const DEFAULT_TAGS = [
-  { id: 't_billable', name: 'billable' },
-  { id: 't_meeting', name: 'meeting' },
+  { id: 't_billable', workspaceId: DEFAULT_WORKSPACE.id, name: 'billable' },
+  { id: 't_meeting', workspaceId: DEFAULT_WORKSPACE.id, name: 'meeting' },
 ];
 
 function read(key, fallback) {
@@ -35,7 +39,23 @@ function write(key, value) {
 /** Simulate async I/O so calling code is written against real latency. */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** Stamp any workspace-less records (from before workspaces existed). */
+function migrateToWorkspace(key, workspaceId) {
+  const items = read(key, []);
+  let changed = false;
+  for (const it of items) {
+    if (!it.workspaceId) {
+      it.workspaceId = workspaceId;
+      changed = true;
+    }
+  }
+  if (changed) write(key, items);
+}
+
 export function createLocalRepository() {
+  if (read(WORKSPACES_KEY, null) === null) {
+    write(WORKSPACES_KEY, [DEFAULT_WORKSPACE]);
+  }
   if (read(PROJECTS_KEY, null) === null) {
     write(PROJECTS_KEY, DEFAULT_PROJECTS);
   }
@@ -43,11 +63,23 @@ export function createLocalRepository() {
     write(TAGS_KEY, DEFAULT_TAGS);
   }
 
+  // Adopt any pre-workspace data into the first (default) workspace.
+  const firstWs = read(WORKSPACES_KEY, [DEFAULT_WORKSPACE])[0] ?? DEFAULT_WORKSPACE;
+  migrateToWorkspace(PROJECTS_KEY, firstWs.id);
+  migrateToWorkspace(TAGS_KEY, firstWs.id);
+  migrateToWorkspace(ENTRIES_KEY, firstWs.id);
+  if (read(ACTIVE_KEY, null) === null) write(ACTIVE_KEY, firstWs.id);
+
+  const activeId = () => read(ACTIVE_KEY, firstWs.id);
+
   return {
-    async listEntries({ from, to }) {
+    async listEntries({ from, to, workspaceId }) {
       await tick();
       const all = read(ENTRIES_KEY, []);
-      return all.filter((e) => e.start >= from && e.start < to);
+      return all.filter(
+        (e) =>
+          e.workspaceId === workspaceId && e.start >= from && e.start < to,
+      );
     },
 
     async createEntry(data) {
@@ -55,6 +87,7 @@ export function createLocalRepository() {
       const all = read(ENTRIES_KEY, []);
       const entry = {
         id: newId(),
+        workspaceId: data.workspaceId ?? activeId(),
         description: data.description ?? '',
         projectId: data.projectId ?? null,
         tagIds: data.tagIds ?? [],
@@ -85,9 +118,11 @@ export function createLocalRepository() {
       );
     },
 
-    async listProjects() {
+    async listProjects(workspaceId) {
       await tick();
-      return read(PROJECTS_KEY, DEFAULT_PROJECTS);
+      return read(PROJECTS_KEY, DEFAULT_PROJECTS).filter(
+        (p) => p.workspaceId === workspaceId,
+      );
     },
 
     async createProject(data) {
@@ -95,6 +130,7 @@ export function createLocalRepository() {
       const all = read(PROJECTS_KEY, []);
       const project = {
         id: newId('p'),
+        workspaceId: data.workspaceId ?? activeId(),
         name: data.name ?? 'New project',
         color: data.color ?? '#6c5ce7',
       };
@@ -122,15 +158,21 @@ export function createLocalRepository() {
       );
     },
 
-    async listTags() {
+    async listTags(workspaceId) {
       await tick();
-      return read(TAGS_KEY, DEFAULT_TAGS);
+      return read(TAGS_KEY, DEFAULT_TAGS).filter(
+        (t) => t.workspaceId === workspaceId,
+      );
     },
 
     async createTag(data) {
       await tick();
       const all = read(TAGS_KEY, []);
-      const tag = { id: newId('t'), name: data.name ?? 'tag' };
+      const tag = {
+        id: newId('t'),
+        workspaceId: data.workspaceId ?? activeId(),
+        name: data.name ?? 'tag',
+      };
       all.push(tag);
       write(TAGS_KEY, all);
       return tag;
@@ -163,6 +205,55 @@ export function createLocalRepository() {
         }
       }
       if (changed) write(ENTRIES_KEY, entries);
+    },
+
+    async listWorkspaces() {
+      await tick();
+      return read(WORKSPACES_KEY, [DEFAULT_WORKSPACE]);
+    },
+
+    async createWorkspace(data) {
+      await tick();
+      const all = read(WORKSPACES_KEY, []);
+      const ws = { id: newId('w'), name: data.name ?? 'New workspace' };
+      all.push(ws);
+      write(WORKSPACES_KEY, all);
+      return ws;
+    },
+
+    async updateWorkspace(id, patch) {
+      await tick();
+      const all = read(WORKSPACES_KEY, []);
+      const idx = all.findIndex((w) => w.id === id);
+      if (idx === -1) throw new Error(`No workspace ${id}`);
+      all[idx] = { ...all[idx], ...patch, id };
+      write(WORKSPACES_KEY, all);
+      return all[idx];
+    },
+
+    async deleteWorkspace(id) {
+      await tick();
+      write(
+        WORKSPACES_KEY,
+        read(WORKSPACES_KEY, []).filter((w) => w.id !== id),
+      );
+      // Cascade: drop everything that belonged to the workspace.
+      for (const key of [ENTRIES_KEY, PROJECTS_KEY, TAGS_KEY]) {
+        write(
+          key,
+          read(key, []).filter((it) => it.workspaceId !== id),
+        );
+      }
+    },
+
+    async getActiveWorkspaceId() {
+      await tick();
+      return read(ACTIVE_KEY, firstWs.id);
+    },
+
+    async setActiveWorkspaceId(id) {
+      await tick();
+      write(ACTIVE_KEY, id);
     },
   };
 }

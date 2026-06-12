@@ -2,6 +2,7 @@
   import { store } from './data/store.js';
   import { formatDuration, addDays } from './lib/time.js';
   import TimerBar from './components/TimerBar.svelte';
+  import WorkspaceSelector from './components/WorkspaceSelector.svelte';
   import TimelineView from './components/TimelineView.svelte';
   import ListView from './components/ListView.svelte';
   import ProjectsModal from './components/ProjectsModal.svelte';
@@ -43,7 +44,7 @@
 </script>
 
 <header class="topbar">
-  <div class="brand">swish</div>
+  <WorkspaceSelector />
   <TimerBar />
 </header>
 
@@ -118,13 +119,6 @@
     background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
-  .brand {
-    font-weight: 800;
-    font-size: 18px;
-    color: var(--accent);
-    letter-spacing: -0.02em;
-  }
-
   .day-nav {
     display: flex;
     align-items: center;

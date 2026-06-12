@@ -17,7 +17,11 @@ export class AppStore {
   projects = $state([]);
   /** @type {import('./repository.js').Tag[]} */
   tags = $state([]);
-  /** 'week' | 'day' */
+  /** @type {import('./repository.js').Workspace[]} */
+  workspaces = $state([]);
+  /** Id of the workspace whose data is currently loaded. */
+  currentWorkspaceId = $state(null);
+  /** 'week' | 'day' | 'list' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
   anchor = $state(startOfDay(new Date()).toISOString());
@@ -52,13 +56,29 @@ export class AppStore {
   /** Map of tagId -> tag. */
   tagsById = $derived(new Map(this.tags.map((t) => [t.id, t])));
 
+  /** The workspace whose data is loaded. */
+  currentWorkspace = $derived(
+    this.workspaces.find((w) => w.id === this.currentWorkspaceId) ?? null,
+  );
+
   /** The currently running entry (open-ended), if any. */
   runningEntry = $derived(this.entries.find((e) => e.end === null) ?? null);
 
   async init() {
+    this.workspaces = await this.#repo.listWorkspaces();
+    const active = await this.#repo.getActiveWorkspaceId();
+    this.currentWorkspaceId =
+      this.workspaces.find((w) => w.id === active)?.id ??
+      this.workspaces[0]?.id ??
+      null;
+    await this.loadWorkspaceData();
+  }
+
+  /** Load every dataset (projects, tags, entries) for the current workspace. */
+  async loadWorkspaceData() {
     [this.projects, this.tags] = await Promise.all([
-      this.#repo.listProjects(),
-      this.#repo.listTags(),
+      this.#repo.listProjects(this.currentWorkspaceId),
+      this.#repo.listTags(this.currentWorkspaceId),
     ]);
     await this.loadRange();
   }
@@ -69,10 +89,25 @@ export class AppStore {
       this.entries = await this.#repo.listEntries({
         from: this.rangeStart,
         to: this.rangeEnd,
+        workspaceId: this.currentWorkspaceId,
       });
     } finally {
       this.loading = false;
     }
+  }
+
+  async switchWorkspace(id) {
+    if (id === this.currentWorkspaceId) return;
+    this.currentWorkspaceId = id;
+    await this.#repo.setActiveWorkspaceId(id);
+    await this.loadWorkspaceData();
+  }
+
+  async addWorkspace(name) {
+    const ws = await this.#repo.createWorkspace({ name });
+    this.workspaces = [...this.workspaces, ws];
+    await this.switchWorkspace(ws.id);
+    return ws;
   }
 
   setView(view) {
@@ -104,7 +139,10 @@ export class AppStore {
   }
 
   async create(data) {
-    const entry = await this.#repo.createEntry(data);
+    const entry = await this.#repo.createEntry({
+      ...data,
+      workspaceId: this.currentWorkspaceId,
+    });
     this.entries = [...this.entries, entry];
     return entry;
   }
@@ -132,7 +170,10 @@ export class AppStore {
   // --- projects --------------------------------------------------------------
 
   async addProject(data = {}) {
-    const project = await this.#repo.createProject(data);
+    const project = await this.#repo.createProject({
+      ...data,
+      workspaceId: this.currentWorkspaceId,
+    });
     this.projects = [...this.projects, project];
     return project;
   }
@@ -158,7 +199,10 @@ export class AppStore {
   // --- tags (global, shared across all projects) -----------------------------
 
   async addTag(data = {}) {
-    const tag = await this.#repo.createTag(data);
+    const tag = await this.#repo.createTag({
+      ...data,
+      workspaceId: this.currentWorkspaceId,
+    });
     this.tags = [...this.tags, tag];
     return tag;
   }

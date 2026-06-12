@@ -6,36 +6,52 @@
  * same methods (using `fetch`) and passing it to `createStore`. Nothing in the
  * UI changes.
  *
+ * Entries, projects and tags all belong to a workspace; the repository scopes
+ * reads/writes by `workspaceId` so switching workspace swaps the whole dataset.
+ *
+ * @typedef {Object} Workspace
+ * @property {string} id
+ * @property {string} name
+ *
  * @typedef {Object} TimeEntry
  * @property {string}  id
+ * @property {string}  workspaceId
  * @property {string}  description
  * @property {string|null} projectId
- * @property {string[]} tagIds  Ids of global tags; independent of project
+ * @property {string[]} tagIds  Ids of tags within the workspace
  * @property {string}  start  ISO 8601 timestamp
  * @property {string|null} end ISO 8601 timestamp, or null while running
  *
  * @typedef {Object} Project
  * @property {string} id
+ * @property {string} workspaceId
  * @property {string} name
  * @property {string} color  CSS color
  *
  * @typedef {Object} Tag
  * @property {string} id
+ * @property {string} workspaceId
  * @property {string} name
  *
  * @typedef {Object} Repository
- * @property {(range: {from: string, to: string}) => Promise<TimeEntry[]>} listEntries
+ * @property {(range: {from: string, to: string, workspaceId: string}) => Promise<TimeEntry[]>} listEntries
  * @property {(data: Partial<TimeEntry>) => Promise<TimeEntry>} createEntry
  * @property {(id: string, patch: Partial<TimeEntry>) => Promise<TimeEntry>} updateEntry
  * @property {(id: string) => Promise<void>} deleteEntry
- * @property {() => Promise<Project[]>} listProjects
+ * @property {(workspaceId: string) => Promise<Project[]>} listProjects
  * @property {(data: Partial<Project>) => Promise<Project>} createProject
  * @property {(id: string, patch: Partial<Project>) => Promise<Project>} updateProject
  * @property {(id: string) => Promise<void>} deleteProject
- * @property {() => Promise<Tag[]>} listTags
+ * @property {(workspaceId: string) => Promise<Tag[]>} listTags
  * @property {(data: Partial<Tag>) => Promise<Tag>} createTag
  * @property {(id: string, patch: Partial<Tag>) => Promise<Tag>} updateTag
  * @property {(id: string) => Promise<void>} deleteTag
+ * @property {() => Promise<Workspace[]>} listWorkspaces
+ * @property {(data: Partial<Workspace>) => Promise<Workspace>} createWorkspace
+ * @property {(id: string, patch: Partial<Workspace>) => Promise<Workspace>} updateWorkspace
+ * @property {(id: string) => Promise<void>} deleteWorkspace
+ * @property {() => Promise<string>} getActiveWorkspaceId
+ * @property {(id: string) => Promise<void>} setActiveWorkspaceId
  */
 
 /** Generate a client-side id. A backend would assign its own on create. */
