@@ -24,14 +24,14 @@
  * @property {(id: string, patch: Partial<TimeEntry>) => Promise<TimeEntry>} updateEntry
  * @property {(id: string) => Promise<void>} deleteEntry
  * @property {() => Promise<Project[]>} listProjects
+ * @property {(data: Partial<Project>) => Promise<Project>} createProject
+ * @property {(id: string, patch: Partial<Project>) => Promise<Project>} updateProject
+ * @property {(id: string) => Promise<void>} deleteProject
  */
 
 /** Generate a client-side id. A backend would assign its own on create. */
-export function newId() {
-  return (
-    'e_' +
-    Date.now().toString(36) +
-    '_' +
-    Math.random().toString(36).slice(2, 8)
-  );
+export function newId(prefix = 'e') {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }

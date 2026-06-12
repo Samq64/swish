@@ -1,0 +1,222 @@
+<script>
+  import { store } from '../data/store.js';
+
+  /** Modal for managing projects: rename, recolor, add and delete. */
+  let { onClose } = $props();
+
+  // Quick-pick palette; a native colour input covers anything custom.
+  const PALETTE = [
+    '#6c5ce7',
+    '#0984e3',
+    '#00b894',
+    '#fdcb6e',
+    '#e17055',
+    '#e84393',
+    '#d63031',
+    '#636e72',
+  ];
+
+  function addProject() {
+    const color = PALETTE[store.projects.length % PALETTE.length];
+    store.addProject({ name: 'New project', color });
+  }
+
+  function onKeydown(event) {
+    if (event.key === 'Escape') onClose?.();
+  }
+</script>
+
+<svelte:window onkeydown={onKeydown} />
+
+<div
+  class="backdrop"
+  role="presentation"
+  onpointerdown={(e) => {
+    if (e.target === e.currentTarget) onClose?.();
+  }}
+>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Projects">
+    <header class="head">
+      <h2>Projects</h2>
+      <button class="close" aria-label="Close" onclick={() => onClose?.()}>
+        ×
+      </button>
+    </header>
+
+    <div class="list">
+      {#each store.projects as p (p.id)}
+        <div class="row">
+          <input
+            class="swatch"
+            type="color"
+            value={p.color}
+            aria-label="Colour for {p.name}"
+            oninput={(e) =>
+              store.updateProject(p.id, { color: e.currentTarget.value })}
+          />
+
+          <div class="palette">
+            {#each PALETTE as c (c)}
+              <button
+                class="dot"
+                class:selected={p.color?.toLowerCase() === c}
+                style:background={c}
+                aria-label="Set colour {c}"
+                onclick={() => store.updateProject(p.id, { color: c })}
+              ></button>
+            {/each}
+          </div>
+
+          <input
+            class="name"
+            type="text"
+            value={p.name}
+            placeholder="Project name"
+            oninput={(e) =>
+              store.updateProject(p.id, { name: e.currentTarget.value })}
+          />
+
+          <button
+            class="delete"
+            aria-label="Delete {p.name}"
+            onclick={() => store.removeProject(p.id)}
+          >
+            Delete
+          </button>
+        </div>
+      {/each}
+
+      {#if store.projects.length === 0}
+        <p class="empty">No projects yet.</p>
+      {/if}
+    </div>
+
+    <footer class="foot">
+      <button class="add" onclick={addProject}>+ Add project</button>
+      <button class="done" onclick={() => onClose?.()}>Done</button>
+    </footer>
+  </div>
+</div>
+
+<style>
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 30, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    width: 460px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .head h2 {
+    margin: 0;
+    font-size: 17px;
+  }
+  .close {
+    border: none;
+    background: none;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+
+  .list {
+    padding: 8px 20px;
+    overflow-y: auto;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--grid-line);
+  }
+  .swatch {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+  }
+  .palette {
+    display: flex;
+    gap: 4px;
+    flex: none;
+  }
+  .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+  }
+  .dot.selected {
+    border-color: var(--text);
+  }
+  .name {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+  .delete {
+    border: none;
+    background: none;
+    color: #d63031;
+    font-size: 13px;
+    flex: none;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .add {
+    border: 1px dashed var(--border);
+    background: none;
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+  }
+  .done {
+    border: none;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-weight: 600;
+  }
+</style>

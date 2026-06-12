@@ -11,9 +11,6 @@ const PROJECTS_KEY = 'swish.projects.v1';
 
 const DEFAULT_PROJECTS = [
   { id: 'p_focus', name: 'Deep Work', color: '#6c5ce7' },
-  { id: 'p_meet', name: 'Meetings', color: '#0984e3' },
-  { id: 'p_admin', name: 'Admin', color: '#00b894' },
-  { id: 'p_break', name: 'Breaks', color: '#fdcb6e' },
 ];
 
 function read(key, fallback) {
@@ -81,6 +78,38 @@ export function createLocalRepository() {
     async listProjects() {
       await tick();
       return read(PROJECTS_KEY, DEFAULT_PROJECTS);
+    },
+
+    async createProject(data) {
+      await tick();
+      const all = read(PROJECTS_KEY, []);
+      const project = {
+        id: newId('p'),
+        name: data.name ?? 'New project',
+        color: data.color ?? '#6c5ce7',
+      };
+      all.push(project);
+      write(PROJECTS_KEY, all);
+      return project;
+    },
+
+    async updateProject(id, patch) {
+      await tick();
+      const all = read(PROJECTS_KEY, []);
+      const idx = all.findIndex((p) => p.id === id);
+      if (idx === -1) throw new Error(`No project ${id}`);
+      all[idx] = { ...all[idx], ...patch, id };
+      write(PROJECTS_KEY, all);
+      return all[idx];
+    },
+
+    async deleteProject(id) {
+      await tick();
+      const all = read(PROJECTS_KEY, []);
+      write(
+        PROJECTS_KEY,
+        all.filter((p) => p.id !== id),
+      );
     },
   };
 }

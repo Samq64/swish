@@ -44,6 +44,23 @@ export function startOfDay(date) {
   return d;
 }
 
+/** A new Date `n` days after `date` (n may be negative). */
+export function addDays(date, n) {
+  const d = startOfDay(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+/**
+ * Start of the week containing `date`. `weekStartsOn` is 0 (Sun) … 1 (Mon).
+ */
+export function startOfWeek(date, weekStartsOn = 1) {
+  const d = startOfDay(date);
+  const diff = (d.getDay() - weekStartsOn + 7) % 7;
+  d.setDate(d.getDate() - diff);
+  return d;
+}
+
 /** Minutes from midnight for an absolute Date/ISO string. */
 export function dateToMinutes(value) {
   const d = new Date(value);
