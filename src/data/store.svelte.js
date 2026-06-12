@@ -1,6 +1,6 @@
 import { startOfDay, startOfWeek, addDays } from '../lib/time.js';
 
-export const WEEK_STARTS_ON = 1; // Monday
+export const WEEK_STARTS_ON = 0; // Sunday
 
 /**
  * Reactive application state, built on Svelte 5 runes. It is the only thing

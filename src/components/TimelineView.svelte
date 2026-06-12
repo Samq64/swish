@@ -51,16 +51,19 @@
   <div class="scroll">
     <!-- Day headers live INSIDE the scroller so they share the body's exact
          column widths (scrollbar included) and stay aligned; `sticky` keeps
-         them pinned to the top while the timeline scrolls. -->
-    <div class="header-row">
-      <div class="gutter-spacer"></div>
-      {#each store.visibleDays as iso (iso)}
-        <div class="day-head" class:today={isToday(iso)}>
-          <span class="dow">{dayName(iso)}</span>
-          <span class="dom">{dayNum(iso)}</span>
-        </div>
-      {/each}
-    </div>
+         them pinned to the top while the timeline scrolls. Redundant in day
+         view, where the nav already shows the date. -->
+    {#if store.view !== 'day'}
+      <div class="header-row">
+        <div class="gutter-spacer"></div>
+        {#each store.visibleDays as iso (iso)}
+          <div class="day-head" class:today={isToday(iso)}>
+            <span class="dow">{dayName(iso)}</span>
+            <span class="dom">{dayNum(iso)}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <div class="body" style:height="{minutesToPx(MINUTES_PER_DAY)}px">
       <div class="gutter">

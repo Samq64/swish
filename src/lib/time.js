@@ -54,7 +54,7 @@ export function addDays(date, n) {
 /**
  * Start of the week containing `date`. `weekStartsOn` is 0 (Sun) … 1 (Mon).
  */
-export function startOfWeek(date, weekStartsOn = 1) {
+export function startOfWeek(date, weekStartsOn = 0) {
   const d = startOfDay(date);
   const diff = (d.getDay() - weekStartsOn + 7) % 7;
   d.setDate(d.getDate() - diff);
