@@ -1,32 +1,15 @@
 <script>
   import { store } from '../data/store.js';
 
-  /** Modal for managing projects: rename, recolor, add and delete. */
+  /** Modal for managing global tags: rename, add and delete. */
   let { onClose } = $props();
-
-  // Quick-pick palette; a native colour input covers anything custom.
-  const PALETTE = [
-    '#6c5ce7',
-    '#0984e3',
-    '#00b894',
-    '#fdcb6e',
-    '#e17055',
-    '#e84393',
-    '#d63031',
-    '#636e72',
-  ];
 
   let query = $state('');
   let filtered = $derived(
-    store.projects.filter((p) =>
-      p.name.toLowerCase().includes(query.trim().toLowerCase()),
+    store.tags.filter((t) =>
+      t.name.toLowerCase().includes(query.trim().toLowerCase()),
     ),
   );
-
-  function addProject() {
-    const color = PALETTE[store.projects.length % PALETTE.length];
-    store.addProject({ name: 'New project', color });
-  }
 
   function onKeydown(event) {
     if (event.key === 'Escape') onClose?.();
@@ -42,58 +25,39 @@
     if (e.target === e.currentTarget) onClose?.();
   }}
 >
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Projects">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Tags">
     <header class="head">
-      <h2>Projects</h2>
+      <h2>Tags</h2>
       <button class="close" aria-label="Close" onclick={() => onClose?.()}>
         ×
       </button>
     </header>
 
+    <p class="hint">Tags are shared across every project.</p>
+
     <input
       class="search"
       type="text"
-      placeholder="Search projects…"
+      placeholder="Search tags…"
       bind:value={query}
     />
 
     <div class="list">
-      {#each filtered as p (p.id)}
+      {#each filtered as t (t.id)}
         <div class="row">
-          <input
-            class="swatch"
-            type="color"
-            value={p.color}
-            aria-label="Colour for {p.name}"
-            oninput={(e) =>
-              store.updateProject(p.id, { color: e.currentTarget.value })}
-          />
-
-          <div class="palette">
-            {#each PALETTE as c (c)}
-              <button
-                class="dot"
-                class:selected={p.color?.toLowerCase() === c}
-                style:background={c}
-                aria-label="Set colour {c}"
-                onclick={() => store.updateProject(p.id, { color: c })}
-              ></button>
-            {/each}
-          </div>
-
+          <span class="hash">#</span>
           <input
             class="name"
             type="text"
-            value={p.name}
-            placeholder="Project name"
+            value={t.name}
+            placeholder="Tag name"
             oninput={(e) =>
-              store.updateProject(p.id, { name: e.currentTarget.value })}
+              store.updateTag(t.id, { name: e.currentTarget.value })}
           />
-
           <button
             class="delete"
-            aria-label="Delete {p.name}"
-            onclick={() => store.removeProject(p.id)}
+            aria-label="Delete {t.name}"
+            onclick={() => store.removeTag(t.id)}
           >
             Delete
           </button>
@@ -102,13 +66,15 @@
 
       {#if filtered.length === 0}
         <p class="empty">
-          {store.projects.length === 0 ? 'No projects yet.' : 'No matches.'}
+          {store.tags.length === 0 ? 'No tags yet.' : 'No matches.'}
         </p>
       {/if}
     </div>
 
     <footer class="foot">
-      <button class="add" onclick={addProject}>+ Add project</button>
+      <button class="add" onclick={() => store.addTag({ name: 'new-tag' })}>
+        + Add tag
+      </button>
       <button class="done" onclick={() => onClose?.()}>Done</button>
     </footer>
   </div>
@@ -125,7 +91,7 @@
     z-index: 100;
   }
   .modal {
-    width: 460px;
+    width: 420px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 64px);
     display: flex;
@@ -138,8 +104,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 8px;
   }
   .head h2 {
     margin: 0;
@@ -153,9 +118,16 @@
     color: var(--muted);
     padding: 0 4px;
   }
+  .hint {
+    margin: 0;
+    padding: 0 20px 8px;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
 
   .search {
-    margin: 0 20px 4px;
+    margin: 8px 20px 4px;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
@@ -168,34 +140,13 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 0;
     border-bottom: 1px solid var(--grid-line);
   }
-  .swatch {
-    width: 28px;
-    height: 28px;
-    flex: none;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: none;
-    cursor: pointer;
-  }
-  .palette {
-    display: flex;
-    gap: 4px;
-    flex: none;
-  }
-  .dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    padding: 0;
-  }
-  .dot.selected {
-    border-color: var(--text);
+  .hash {
+    color: var(--muted);
+    font-weight: 700;
   }
   .name {
     flex: 1;

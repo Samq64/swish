@@ -1,13 +1,42 @@
 <script>
   import { startOfDay } from '../lib/time.js';
+  import TagCombobox from './TagCombobox.svelte';
 
   /**
    * Small editor for a single entry. Emits granular patches via `onChange`
    * so the store/repository sees the same shape of update regardless of which
    * field changed.
    */
-  let { entry, projects = [], pos = { x: 0, y: 0 }, onChange, onDelete, onClose } =
-    $props();
+  let {
+    entry,
+    projects = [],
+    tags = [],
+    pos = { x: 0, y: 0 },
+    onChange,
+    onCreateTag,
+    onDelete,
+    onClose,
+  } = $props();
+
+  let assigned = $derived(new Set(entry.tagIds ?? []));
+
+  function toggleTag(id) {
+    const next = new Set(assigned);
+    next.has(id) ? next.delete(id) : next.add(id);
+    onChange?.({ tagIds: [...next] });
+  }
+
+  async function createTag(name) {
+    // Reuse an existing tag with the same name (case-insensitive) if present.
+    const existing = tags.find(
+      (t) => t.name.toLowerCase() === name.toLowerCase(),
+    );
+    const tag = existing ?? (await onCreateTag?.(name));
+    if (tag && !assigned.has(tag.id)) {
+      onChange?.({ tagIds: [...assigned, tag.id] });
+    }
+    return tag;
+  }
 
   function isoToTimeInput(iso) {
     const d = new Date(iso);
@@ -59,6 +88,16 @@
       {/each}
     </select>
   </label>
+
+  <div class="tags-field">
+    <span class="label">Tags</span>
+    <TagCombobox
+      {tags}
+      selectedIds={entry.tagIds ?? []}
+      onToggle={toggleTag}
+      onCreate={createTag}
+    />
+  </div>
 
   <div class="times">
     <input
@@ -122,6 +161,15 @@
     border-radius: 6px;
     padding: 4px 6px;
     background: var(--surface);
+  }
+  .tags-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tags-field .label {
+    font-size: 13px;
+    color: var(--muted);
   }
   .times {
     display: flex;

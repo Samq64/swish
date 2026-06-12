@@ -214,6 +214,12 @@
     return p?.color ?? 'var(--accent)';
   }
 
+  function tagNamesFor(entry) {
+    return (entry?.tagIds ?? [])
+      .map((id) => store.tagsById.get(id)?.name)
+      .filter(Boolean);
+  }
+
   // "now" indicator, only on today's column.
   let nowMin = $state(new Date().getHours() * 60 + new Date().getMinutes());
   $effect(() => {
@@ -265,6 +271,7 @@
         block={b}
         label={entriesById.get(b.id)?.description}
         color={colorFor(entriesById.get(b.id))}
+        tags={tagNamesFor(entriesById.get(b.id))}
         selected={selectedId === b.id}
         dragging={drag?.entryId === b.id}
         onGrab={(mode, event) =>

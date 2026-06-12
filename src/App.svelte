@@ -3,11 +3,14 @@
   import { formatDuration, addDays } from './lib/time.js';
   import TimerBar from './components/TimerBar.svelte';
   import TimelineView from './components/TimelineView.svelte';
+  import ListView from './components/ListView.svelte';
   import ProjectsModal from './components/ProjectsModal.svelte';
+  import TagsModal from './components/TagsModal.svelte';
 
   store.init();
 
   let showProjects = $state(false);
+  let showTags = $state(false);
 
   // Range label: a single day, or "Jun 9 – 15" for a week.
   let rangeLabel = $derived.by(() => {
@@ -64,20 +67,34 @@
     >
       Week
     </button>
+    <button
+      class:active={store.view === 'list'}
+      onclick={() => store.setView('list')}
+    >
+      List
+    </button>
   </div>
 
   <button class="nav-btn projects" onclick={() => (showProjects = true)}>
     Projects
   </button>
+  <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
   <span class="total">{formatDuration(totalMin)} tracked</span>
 </nav>
 
 <main class="timeline-wrap">
-  <TimelineView />
+  {#if store.view === 'list'}
+    <ListView />
+  {:else}
+    <TimelineView />
+  {/if}
 </main>
 
 {#if showProjects}
   <ProjectsModal onClose={() => (showProjects = false)} />
+{/if}
+{#if showTags}
+  <TagsModal onClose={() => (showTags = false)} />
 {/if}
 
 <style>

@@ -8,9 +8,15 @@ import { newId } from './repository.js';
 
 const ENTRIES_KEY = 'swish.entries.v1';
 const PROJECTS_KEY = 'swish.projects.v1';
+const TAGS_KEY = 'swish.tags.v1';
 
 const DEFAULT_PROJECTS = [
   { id: 'p_focus', name: 'Deep Work', color: '#6c5ce7' },
+];
+
+const DEFAULT_TAGS = [
+  { id: 't_billable', name: 'billable' },
+  { id: 't_meeting', name: 'meeting' },
 ];
 
 function read(key, fallback) {
@@ -33,6 +39,9 @@ export function createLocalRepository() {
   if (read(PROJECTS_KEY, null) === null) {
     write(PROJECTS_KEY, DEFAULT_PROJECTS);
   }
+  if (read(TAGS_KEY, null) === null) {
+    write(TAGS_KEY, DEFAULT_TAGS);
+  }
 
   return {
     async listEntries({ from, to }) {
@@ -48,6 +57,7 @@ export function createLocalRepository() {
         id: newId(),
         description: data.description ?? '',
         projectId: data.projectId ?? null,
+        tagIds: data.tagIds ?? [],
         start: data.start,
         end: data.end ?? null,
       };
@@ -110,6 +120,49 @@ export function createLocalRepository() {
         PROJECTS_KEY,
         all.filter((p) => p.id !== id),
       );
+    },
+
+    async listTags() {
+      await tick();
+      return read(TAGS_KEY, DEFAULT_TAGS);
+    },
+
+    async createTag(data) {
+      await tick();
+      const all = read(TAGS_KEY, []);
+      const tag = { id: newId('t'), name: data.name ?? 'tag' };
+      all.push(tag);
+      write(TAGS_KEY, all);
+      return tag;
+    },
+
+    async updateTag(id, patch) {
+      await tick();
+      const all = read(TAGS_KEY, []);
+      const idx = all.findIndex((t) => t.id === id);
+      if (idx === -1) throw new Error(`No tag ${id}`);
+      all[idx] = { ...all[idx], ...patch, id };
+      write(TAGS_KEY, all);
+      return all[idx];
+    },
+
+    async deleteTag(id) {
+      await tick();
+      const all = read(TAGS_KEY, []);
+      write(
+        TAGS_KEY,
+        all.filter((t) => t.id !== id),
+      );
+      // Strip the tag from every entry that referenced it, everywhere.
+      const entries = read(ENTRIES_KEY, []);
+      let changed = false;
+      for (const e of entries) {
+        if (e.tagIds?.includes(id)) {
+          e.tagIds = e.tagIds.filter((t) => t !== id);
+          changed = true;
+        }
+      }
+      if (changed) write(ENTRIES_KEY, entries);
     },
   };
 }

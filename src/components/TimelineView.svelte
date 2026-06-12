@@ -86,7 +86,9 @@
   <EditPopover
     entry={selectedEntry}
     projects={store.projects}
+    tags={store.tags}
     pos={editorPos}
+    onCreateTag={(name) => store.addTag({ name })}
     onChange={(patch) => store.update(selectedEntry.id, patch)}
     onDelete={() => {
       store.remove(selectedEntry.id);

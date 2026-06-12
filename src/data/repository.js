@@ -10,6 +10,7 @@
  * @property {string}  id
  * @property {string}  description
  * @property {string|null} projectId
+ * @property {string[]} tagIds  Ids of global tags; independent of project
  * @property {string}  start  ISO 8601 timestamp
  * @property {string|null} end ISO 8601 timestamp, or null while running
  *
@@ -17,6 +18,10 @@
  * @property {string} id
  * @property {string} name
  * @property {string} color  CSS color
+ *
+ * @typedef {Object} Tag
+ * @property {string} id
+ * @property {string} name
  *
  * @typedef {Object} Repository
  * @property {(range: {from: string, to: string}) => Promise<TimeEntry[]>} listEntries
@@ -27,6 +32,10 @@
  * @property {(data: Partial<Project>) => Promise<Project>} createProject
  * @property {(id: string, patch: Partial<Project>) => Promise<Project>} updateProject
  * @property {(id: string) => Promise<void>} deleteProject
+ * @property {() => Promise<Tag[]>} listTags
+ * @property {(data: Partial<Tag>) => Promise<Tag>} createTag
+ * @property {(id: string, patch: Partial<Tag>) => Promise<Tag>} updateTag
+ * @property {(id: string) => Promise<void>} deleteTag
  */
 
 /** Generate a client-side id. A backend would assign its own on create. */

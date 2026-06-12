@@ -10,6 +10,7 @@
     block,
     color = 'var(--accent)',
     label = '',
+    tags = [],
     selected = false,
     dragging = false,
     running = false,
@@ -65,6 +66,13 @@
     {#if !compact}
       <span class="range">
         {formatClock(block.startMin)} – {formatClock(block.endMin)}
+      </span>
+    {/if}
+    {#if !compact && tags.length}
+      <span class="tags">
+        {#each tags as t (t)}
+          <span class="tag">{t}</span>
+        {/each}
       </span>
     {/if}
   </div>
@@ -154,6 +162,21 @@
   .range {
     font-size: 11px;
     opacity: 0.75;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .tag {
+    font-size: 10px;
+    line-height: 1.4;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--entry-color) 22%, white);
+    color: color-mix(in srgb, var(--entry-color) 75%, #1a1a22);
+    white-space: nowrap;
   }
 
   .handle {

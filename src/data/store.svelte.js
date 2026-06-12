@@ -15,6 +15,8 @@ export class AppStore {
   entries = $state([]);
   /** @type {import('./repository.js').Project[]} */
   projects = $state([]);
+  /** @type {import('./repository.js').Tag[]} */
+  tags = $state([]);
   /** 'week' | 'day' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
@@ -47,11 +49,17 @@ export class AppStore {
   /** Map of projectId -> project, for quick lookups in the UI. */
   projectsById = $derived(new Map(this.projects.map((p) => [p.id, p])));
 
+  /** Map of tagId -> tag. */
+  tagsById = $derived(new Map(this.tags.map((t) => [t.id, t])));
+
   /** The currently running entry (open-ended), if any. */
   runningEntry = $derived(this.entries.find((e) => e.end === null) ?? null);
 
   async init() {
-    this.projects = await this.#repo.listProjects();
+    [this.projects, this.tags] = await Promise.all([
+      this.#repo.listProjects(),
+      this.#repo.listTags(),
+    ]);
     await this.loadRange();
   }
 
@@ -73,9 +81,9 @@ export class AppStore {
     return this.loadRange();
   }
 
-  /** Step forward/back by one view-unit (a day or a week). */
+  /** Step forward/back by one view-unit (a day, or a week for week/list). */
   shift(delta) {
-    const step = this.view === 'week' ? 7 : 1;
+    const step = this.view === 'day' ? 1 : 7;
     this.anchor = addDays(this.anchor, delta * step).toISOString();
     return this.loadRange();
   }
@@ -145,5 +153,31 @@ export class AppStore {
       e.projectId === id ? { ...e, projectId: null } : e,
     );
     await this.#repo.deleteProject(id);
+  }
+
+  // --- tags (global, shared across all projects) -----------------------------
+
+  async addTag(data = {}) {
+    const tag = await this.#repo.createTag(data);
+    this.tags = [...this.tags, tag];
+    return tag;
+  }
+
+  async updateTag(id, patch) {
+    this.tags = this.tags.map((t) => (t.id === id ? { ...t, ...patch } : t));
+    const saved = await this.#repo.updateTag(id, patch);
+    this.tags = this.tags.map((t) => (t.id === id ? saved : t));
+    return saved;
+  }
+
+  async removeTag(id) {
+    this.tags = this.tags.filter((t) => t.id !== id);
+    // Detach the tag from any loaded entries that referenced it.
+    this.entries = this.entries.map((e) =>
+      e.tagIds?.includes(id)
+        ? { ...e, tagIds: e.tagIds.filter((t) => t !== id) }
+        : e,
+    );
+    await this.#repo.deleteTag(id);
   }
 }
