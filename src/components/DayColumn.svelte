@@ -58,9 +58,19 @@
 
   let entriesById = $derived(new Map(dayEntries.map((e) => [e.id, e])));
 
-  // Completed entries become blocks; the running entry lives in the TimerBar.
+  /**
+   * Completed entries as timeline blocks. `order` is the creation-order index,
+   * a stable key so lane columns don't swap when an entry is dragged. (The
+   * running entry has no end and lives in the TimerBar.)
+   */
+  function baseBlocks() {
+    return dayEntries
+      .filter((e) => e.end)
+      .map((e, i) => ({ ...toBlock(e), order: i }));
+  }
+
   let blocks = $derived.by(() => {
-    const arr = dayEntries.filter((e) => e.end).map(toBlock);
+    const arr = baseBlocks();
     // Freeze the layout during a move/resize so neighbours don't jump lanes.
     const lanes = frozenLanes ?? packLanes(arr);
     return arr.map((b) => {
@@ -107,7 +117,7 @@
     const b = toBlock(entry);
     const m = pointerMinutes(event);
     // Snapshot the current layout so neighbours stay put for the whole gesture.
-    frozenLanes = packLanes(dayEntries.filter((e) => e.end).map(toBlock));
+    frozenLanes = packLanes(baseBlocks());
     drag = {
       mode,
       entryId: entry.id,
@@ -216,6 +226,22 @@
   let isToday = $derived(
     startOfDay(dayISO).getTime() === startOfDay(new Date()).getTime(),
   );
+
+  /**
+   * The running entry as a live block growing to "now". It is kept out of
+   * lane-packing (see baseBlocks) so it overlaps neighbours rather than
+   * squeezing them, and is rendered on top.
+   */
+  let runningBlock = $derived.by(() => {
+    const r = store.runningEntry;
+    if (!r) return null;
+    const dayStart = startOfDay(dayISO).getTime();
+    const startTs = new Date(r.start).getTime();
+    if (startTs < dayStart || startTs >= dayStart + 86_400_000) return null;
+    const startMin = clamp((startTs - dayStart) / 60000, 0, MINUTES_PER_DAY);
+    const endMin = clamp(nowMin, startMin, MINUTES_PER_DAY);
+    return { id: r.id, startMin, endMin, lane: 0, lanes: 1 };
+  });
 </script>
 
 <div
@@ -251,6 +277,15 @@
         block={{ ...drag, id: '__ghost__', lane: 0, lanes: 1 }}
         label="New entry"
         dragging
+      />
+    {/if}
+
+    {#if runningBlock}
+      <TimeEntryBlock
+        block={runningBlock}
+        label={store.runningEntry?.description || 'Running…'}
+        color={colorFor(store.runningEntry)}
+        running
       />
     {/if}
   </div>

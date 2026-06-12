@@ -12,6 +12,7 @@
     label = '',
     selected = false,
     dragging = false,
+    running = false,
     onGrab,
   } = $props();
 
@@ -34,6 +35,7 @@
   class="entry"
   class:selected
   class:dragging
+  class:running
   style:top="{top}px"
   style:height="{height}px"
   style:left="calc({leftPct}% + 4px)"
@@ -46,15 +48,17 @@
   role="button"
   tabindex="0"
 >
-  <div
-    class="handle handle-top"
-    role="separator"
-    aria-label="Adjust start time"
-    onpointerdown={(e) => {
-      e.stopPropagation();
-      grab('resize-start', e);
-    }}
-  ></div>
+  {#if !running}
+    <div
+      class="handle handle-top"
+      role="separator"
+      aria-label="Adjust start time"
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        grab('resize-start', e);
+      }}
+    ></div>
+  {/if}
 
   <div class="body" class:compact>
     <span class="desc">{label || 'No description'}</span>
@@ -65,20 +69,24 @@
     {/if}
   </div>
 
-  <div
-    class="handle handle-bottom"
-    role="separator"
-    aria-label="Adjust end time"
-    onpointerdown={(e) => {
-      e.stopPropagation();
-      grab('resize-end', e);
-    }}
-  ></div>
+  {#if !running}
+    <div
+      class="handle handle-bottom"
+      role="separator"
+      aria-label="Adjust end time"
+      onpointerdown={(e) => {
+        e.stopPropagation();
+        grab('resize-end', e);
+      }}
+    ></div>
+  {/if}
 </div>
 
 <style>
   .entry {
     position: absolute;
+    /* Keep short entries tall enough to read one line of text. */
+    min-height: 20px;
     border-radius: 6px;
     background: color-mix(in srgb, var(--entry-color) 16%, white);
     border-left: 3px solid var(--entry-color);
@@ -100,6 +108,27 @@
     cursor: grabbing;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     z-index: 5;
+  }
+  .entry.running {
+    /* A live entry: no minimum height, floats over others, and lets clicks
+       through so you can still create entries behind it. */
+    min-height: 0;
+    z-index: 7;
+    pointer-events: none;
+    cursor: default;
+    border-style: dashed;
+    border-width: 0 0 0 3px;
+    box-shadow: 0 0 0 1px var(--entry-color) inset;
+    animation: running-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes running-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 
   .body {

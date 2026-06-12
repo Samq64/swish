@@ -105,40 +105,51 @@ export function formatClock(minutes) {
 }
 
 /**
- * Greedy lane assignment so overlapping entries render side by side.
- * Returns a Map of entry id -> { lane, lanes } where `lanes` is the total
- * number of columns in that entry's overlap cluster.
+ * Lane assignment so overlapping entries render side by side. Returns a Map of
+ * entry id -> { lane, lanes } where `lanes` is the number of columns in that
+ * entry's overlap cluster.
  *
- * @param {Array<{id: string, startMin: number, endMin: number}>} blocks
+ * Lanes are assigned by each block's stable `order` key (falling back to start
+ * time), NOT by start time alone. This keeps columns put when an entry is
+ * dragged: two side-by-side entries never swap places just because one now
+ * starts earlier than the other.
+ *
+ * @param {Array<{id: string, startMin: number, endMin: number, order?: number}>} blocks
  */
 export function packLanes(blocks) {
   const result = new Map();
-  const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin);
+  const overlaps = (a, b) => a.startMin < b.endMin && b.startMin < a.endMin;
+
+  // Cluster by time overlap (must walk in time order to find contiguous runs).
+  const byTime = [...blocks].sort(
+    (a, b) => a.startMin - b.startMin || a.endMin - b.endMin,
+  );
 
   let cluster = [];
   let clusterEnd = -Infinity;
 
   const flush = () => {
     if (cluster.length === 0) return;
-    // Assign each block in the cluster to the first free lane.
-    const laneEnds = []; // laneEnds[i] = endMin of last block placed in lane i
-    for (const b of cluster) {
-      let lane = laneEnds.findIndex((end) => end <= b.startMin);
+    // Within the cluster, place blocks in a STABLE order so columns are kept.
+    const ordered = [...cluster].sort(
+      (a, b) => (a.order ?? a.startMin) - (b.order ?? b.startMin),
+    );
+    const lanes = []; // lanes[i] = blocks already placed in column i
+    for (const b of ordered) {
+      let lane = lanes.findIndex((col) => col.every((x) => !overlaps(x, b)));
       if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(b.endMin);
-      } else {
-        laneEnds[lane] = b.endMin;
+        lane = lanes.length;
+        lanes.push([]);
       }
+      lanes[lane].push(b);
       result.set(b.id, { lane, lanes: 0 });
     }
-    const lanes = laneEnds.length;
-    for (const b of cluster) result.get(b.id).lanes = lanes;
+    for (const b of cluster) result.get(b.id).lanes = lanes.length;
     cluster = [];
     clusterEnd = -Infinity;
   };
 
-  for (const b of sorted) {
+  for (const b of byTime) {
     if (b.startMin >= clusterEnd && cluster.length > 0) flush();
     cluster.push(b);
     clusterEnd = Math.max(clusterEnd, b.endMin);

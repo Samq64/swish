@@ -48,22 +48,28 @@
 </script>
 
 <div class="view">
-  <!-- Sticky day headers, aligned with the columns below. -->
-  <div class="header-row">
-    <div class="gutter-spacer"></div>
-    {#each store.visibleDays as iso (iso)}
-      <div class="day-head" class:today={isToday(iso)}>
-        <span class="dow">{dayName(iso)}</span>
-        <span class="dom">{dayNum(iso)}</span>
-      </div>
-    {/each}
-  </div>
-
   <div class="scroll">
+    <!-- Day headers live INSIDE the scroller so they share the body's exact
+         column widths (scrollbar included) and stay aligned; `sticky` keeps
+         them pinned to the top while the timeline scrolls. -->
+    <div class="header-row">
+      <div class="gutter-spacer"></div>
+      {#each store.visibleDays as iso (iso)}
+        <div class="day-head" class:today={isToday(iso)}>
+          <span class="dow">{dayName(iso)}</span>
+          <span class="dom">{dayNum(iso)}</span>
+        </div>
+      {/each}
+    </div>
+
     <div class="body" style:height="{minutesToPx(MINUTES_PER_DAY)}px">
       <div class="gutter">
         {#each hours as h (h)}
-          <div class="hour-label" style:top="{minutesToPx(h * 60)}px">
+          <div
+            class="hour-label"
+            class:first={h === 0}
+            style:top="{minutesToPx(h * 60)}px"
+          >
             {hourLabel(h)}
           </div>
         {/each}
@@ -100,10 +106,12 @@
   }
 
   .header-row {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
-    z-index: 2;
   }
   .gutter-spacer {
     width: 56px;
@@ -161,5 +169,10 @@
     text-align: right;
     font-size: 11px;
     color: var(--muted);
+  }
+  /* The topmost label has no gridline above it; nudge it down so "12 AM"
+     sits just below the top edge instead of poking under the header. */
+  .hour-label.first {
+    transform: translateY(2px);
   }
 </style>
