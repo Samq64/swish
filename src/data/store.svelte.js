@@ -123,9 +123,14 @@ export class AppStore {
     return this.loadRange();
   }
 
-  goToday() {
-    this.anchor = startOfDay(new Date()).toISOString();
+  /** Jump the view to the range containing `date` (a Date or ISO string). */
+  goToDate(date) {
+    this.anchor = startOfDay(date).toISOString();
     return this.loadRange();
+  }
+
+  goToday() {
+    return this.goToDate(new Date());
   }
 
   /** Entries belonging to a single day (start within that day). */

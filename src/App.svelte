@@ -31,6 +31,19 @@
     )}`;
   });
 
+  // Anchor formatted as YYYY-MM-DD for the date picker's value.
+  let anchorInput = $derived.by(() => {
+    const d = new Date(store.anchor);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+
+  function pickDate(value) {
+    if (!value) return; // ignore a cleared input
+    const [y, m, d] = value.split('-').map(Number);
+    store.goToDate(new Date(y, m - 1, d)); // local date, no UTC shift
+  }
+
   // Total tracked minutes across the visible range (completed entries only).
   let totalMin = $derived(
     store.entries
@@ -48,7 +61,13 @@
   <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
     ‹
   </button>
-  <button class="nav-btn today" onclick={() => store.goToday()}>Today</button>
+  <input
+    class="date-input"
+    type="date"
+    aria-label="Go to date"
+    value={anchorInput}
+    onchange={(e) => pickDate(e.currentTarget.value)}
+  />
   <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
     ›
   </button>
@@ -133,6 +152,14 @@
   }
   .nav-btn:hover {
     background: var(--bg);
+  }
+  .date-input {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 4px 10px;
+    color: var(--text);
+    font-size: 14px;
   }
   .range-label {
     margin: 0 0 0 8px;
