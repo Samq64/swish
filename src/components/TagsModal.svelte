@@ -1,15 +1,12 @@
 <script>
   import { store } from '../data/store.js';
+  import { filterByName } from '../lib/search.js';
 
   /** Modal for managing global tags: rename, add and delete. */
   let { onClose } = $props();
 
   let query = $state('');
-  let filtered = $derived(
-    store.tags.filter((t) =>
-      t.name.toLowerCase().includes(query.trim().toLowerCase()),
-    ),
-  );
+  let filtered = $derived(filterByName(store.tags, query));
 
   function onKeydown(event) {
     if (event.key === 'Escape') onClose?.();

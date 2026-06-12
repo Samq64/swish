@@ -147,14 +147,22 @@ export class AppStore {
     return entry;
   }
 
-  async update(id, patch) {
-    // Optimistic: reflect the change immediately, reconcile with the result.
-    this.entries = this.entries.map((e) =>
-      e.id === id ? { ...e, ...patch } : e,
-    );
-    const saved = await this.#repo.updateEntry(id, patch);
-    this.entries = this.entries.map((e) => (e.id === id ? saved : e));
+  /**
+   * Optimistically patch the item with `id` in a state array (`entries` |
+   * `projects` | `tags`): apply the change immediately, then reconcile with the
+   * value the repository returns.
+   */
+  async #patch(field, id, patch, repoFn) {
+    this[field] = this[field].map((x) => (x.id === id ? { ...x, ...patch } : x));
+    const saved = await repoFn(id, patch);
+    this[field] = this[field].map((x) => (x.id === id ? saved : x));
     return saved;
+  }
+
+  update(id, patch) {
+    return this.#patch('entries', id, patch, (i, p) =>
+      this.#repo.updateEntry(i, p),
+    );
   }
 
   async remove(id) {
@@ -178,13 +186,10 @@ export class AppStore {
     return project;
   }
 
-  async updateProject(id, patch) {
-    this.projects = this.projects.map((p) =>
-      p.id === id ? { ...p, ...patch } : p,
+  updateProject(id, patch) {
+    return this.#patch('projects', id, patch, (i, p) =>
+      this.#repo.updateProject(i, p),
     );
-    const saved = await this.#repo.updateProject(id, patch);
-    this.projects = this.projects.map((p) => (p.id === id ? saved : p));
-    return saved;
   }
 
   async removeProject(id) {
@@ -207,11 +212,8 @@ export class AppStore {
     return tag;
   }
 
-  async updateTag(id, patch) {
-    this.tags = this.tags.map((t) => (t.id === id ? { ...t, ...patch } : t));
-    const saved = await this.#repo.updateTag(id, patch);
-    this.tags = this.tags.map((t) => (t.id === id ? saved : t));
-    return saved;
+  updateTag(id, patch) {
+    return this.#patch('tags', id, patch, (i, p) => this.#repo.updateTag(i, p));
   }
 
   async removeTag(id) {

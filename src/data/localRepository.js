@@ -39,19 +39,6 @@ function write(key, value) {
 /** Simulate async I/O so calling code is written against real latency. */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Stamp any workspace-less records (from before workspaces existed). */
-function migrateToWorkspace(key, workspaceId) {
-  const items = read(key, []);
-  let changed = false;
-  for (const it of items) {
-    if (!it.workspaceId) {
-      it.workspaceId = workspaceId;
-      changed = true;
-    }
-  }
-  if (changed) write(key, items);
-}
-
 export function createLocalRepository() {
   if (read(WORKSPACES_KEY, null) === null) {
     write(WORKSPACES_KEY, [DEFAULT_WORKSPACE]);
@@ -62,15 +49,11 @@ export function createLocalRepository() {
   if (read(TAGS_KEY, null) === null) {
     write(TAGS_KEY, DEFAULT_TAGS);
   }
+  if (read(ACTIVE_KEY, null) === null) {
+    write(ACTIVE_KEY, DEFAULT_WORKSPACE.id);
+  }
 
-  // Adopt any pre-workspace data into the first (default) workspace.
-  const firstWs = read(WORKSPACES_KEY, [DEFAULT_WORKSPACE])[0] ?? DEFAULT_WORKSPACE;
-  migrateToWorkspace(PROJECTS_KEY, firstWs.id);
-  migrateToWorkspace(TAGS_KEY, firstWs.id);
-  migrateToWorkspace(ENTRIES_KEY, firstWs.id);
-  if (read(ACTIVE_KEY, null) === null) write(ACTIVE_KEY, firstWs.id);
-
-  const activeId = () => read(ACTIVE_KEY, firstWs.id);
+  const activeId = () => read(ACTIVE_KEY, DEFAULT_WORKSPACE.id);
 
   return {
     async listEntries({ from, to, workspaceId }) {
@@ -248,7 +231,7 @@ export function createLocalRepository() {
 
     async getActiveWorkspaceId() {
       await tick();
-      return read(ACTIVE_KEY, firstWs.id);
+      return activeId();
     },
 
     async setActiveWorkspaceId(id) {

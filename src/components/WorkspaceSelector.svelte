@@ -1,5 +1,6 @@
 <script>
   import { store } from '../data/store.js';
+  import { autofocus, clickOutside } from '../lib/actions.js';
 
   /**
    * Replaces the static brand. Shows the active workspace and opens a dropdown
@@ -10,7 +11,6 @@
   let open = $state(false);
   let creating = $state(false);
   let newName = $state('');
-  let root;
 
   function initial(name) {
     return (name ?? '?').trim().slice(0, 1).toUpperCase() || '?';
@@ -33,19 +33,9 @@
     await store.addWorkspace(name);
     close();
   }
-
-  function focus(node) {
-    node.focus();
-  }
-
-  function onWindowPointerDown(e) {
-    if (open && root && !root.contains(e.target)) close();
-  }
 </script>
 
-<svelte:window onpointerdown={onWindowPointerDown} />
-
-<div class="ws" bind:this={root}>
+<div class="ws" use:clickOutside={close}>
   <button
     class="trigger"
     aria-expanded={open}
@@ -82,7 +72,7 @@
           type="text"
           placeholder="Workspace name…"
           bind:value={newName}
-          use:focus
+          use:autofocus
           onkeydown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();

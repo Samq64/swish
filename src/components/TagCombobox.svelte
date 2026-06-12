@@ -1,4 +1,7 @@
 <script>
+  import { autofocus, clickOutside } from '../lib/actions.js';
+  import { filterByName, hasExactName } from '../lib/search.js';
+
   /**
    * A searchable tag picker: a trigger showing the assigned tags, which opens
    * a dropdown of checkboxes. Typing filters the list and, when nothing
@@ -11,20 +14,12 @@
 
   let open = $state(false);
   let query = $state('');
-  let root;
 
   let selected = $derived(new Set(selectedIds));
   let selectedTags = $derived(tags.filter((t) => selected.has(t.id)));
 
-  let needle = $derived(query.trim().toLowerCase());
-  let filtered = $derived(
-    needle ? tags.filter((t) => t.name.toLowerCase().includes(needle)) : tags,
-  );
-  let exact = $derived(tags.some((t) => t.name.toLowerCase() === needle));
-
-  function focus(node) {
-    node.focus();
-  }
+  let filtered = $derived(filterByName(tags, query));
+  let exact = $derived(hasExactName(tags, query));
 
   async function create() {
     const name = query.trim();
@@ -32,15 +27,9 @@
     await onCreate?.(name);
     query = '';
   }
-
-  function onWindowPointerDown(e) {
-    if (open && root && !root.contains(e.target)) open = false;
-  }
 </script>
 
-<svelte:window onpointerdown={onWindowPointerDown} />
-
-<div class="combo" bind:this={root}>
+<div class="combo" use:clickOutside={() => (open = false)}>
   <button
     type="button"
     class="trigger"
@@ -66,7 +55,7 @@
         type="text"
         placeholder="Search or create…"
         bind:value={query}
-        use:focus
+        use:autofocus
         onkeydown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -89,7 +78,7 @@
           </label>
         {/each}
 
-        {#if needle && !exact}
+        {#if query.trim() && !exact}
           <button type="button" class="create" onclick={create}>
             + Create “{query.trim()}”
           </button>

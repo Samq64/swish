@@ -11,6 +11,8 @@
     minutesToISO,
     packLanes,
   } from '../lib/time.js';
+  import { entryColor, entryTagNames } from '../lib/entries.js';
+  import { clock } from '../lib/clock.svelte.js';
   import TimeEntryBlock from './TimeEntryBlock.svelte';
 
   /**
@@ -208,27 +210,8 @@
     }
   }
 
-  function colorFor(entry) {
-    const p =
-      entry && entry.projectId ? store.projectsById.get(entry.projectId) : null;
-    return p?.color ?? 'var(--accent)';
-  }
-
-  function tagNamesFor(entry) {
-    return (entry?.tagIds ?? [])
-      .map((id) => store.tagsById.get(id)?.name)
-      .filter(Boolean);
-  }
-
-  // "now" indicator, only on today's column.
-  let nowMin = $state(new Date().getHours() * 60 + new Date().getMinutes());
-  $effect(() => {
-    const t = setInterval(() => {
-      const n = new Date();
-      nowMin = n.getHours() * 60 + n.getMinutes();
-    }, 30_000);
-    return () => clearInterval(t);
-  });
+  // "now" indicator, only on today's column; one shared ticker for all columns.
+  $effect(() => clock.subscribe());
   let isToday = $derived(
     startOfDay(dayISO).getTime() === startOfDay(new Date()).getTime(),
   );
@@ -245,7 +228,7 @@
     const startTs = new Date(r.start).getTime();
     if (startTs < dayStart || startTs >= dayStart + 86_400_000) return null;
     const startMin = clamp((startTs - dayStart) / 60000, 0, MINUTES_PER_DAY);
-    const endMin = clamp(nowMin, startMin, MINUTES_PER_DAY);
+    const endMin = clamp(clock.minute, startMin, MINUTES_PER_DAY);
     return { id: r.id, startMin, endMin, lane: 0, lanes: 1 };
   });
 </script>
@@ -267,15 +250,15 @@
 
   <div class="lanes">
     {#each blocks as b (b.id)}
+      {@const entry = entriesById.get(b.id)}
       <TimeEntryBlock
         block={b}
-        label={entriesById.get(b.id)?.description}
-        color={colorFor(entriesById.get(b.id))}
-        tags={tagNamesFor(entriesById.get(b.id))}
+        label={entry?.description}
+        color={entryColor(entry, store.projectsById)}
+        tags={entryTagNames(entry, store.tagsById)}
         selected={selectedId === b.id}
         dragging={drag?.entryId === b.id}
-        onGrab={(mode, event) =>
-          beginEntryDrag(entriesById.get(b.id), mode, event)}
+        onGrab={(mode, event) => beginEntryDrag(entry, mode, event)}
       />
     {/each}
 
@@ -291,14 +274,14 @@
       <TimeEntryBlock
         block={runningBlock}
         label={store.runningEntry?.description || 'Running…'}
-        color={colorFor(store.runningEntry)}
+        color={entryColor(store.runningEntry, store.projectsById)}
         running
       />
     {/if}
   </div>
 
   {#if isToday}
-    <div class="now-line" style:top="{minutesToPx(nowMin)}px">
+    <div class="now-line" style:top="{minutesToPx(clock.minute)}px">
       <span class="now-dot"></span>
     </div>
   {/if}

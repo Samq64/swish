@@ -6,6 +6,7 @@
     dateToMinutes,
     clamp,
   } from '../lib/time.js';
+  import { entryProject, entryTagNames, entryDurationMin } from '../lib/entries.js';
   import EditPopover from './EditPopover.svelte';
 
   /**
@@ -44,10 +45,6 @@
     filterProjectIds = new Set();
   }
 
-  function durationMin(e) {
-    return (new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000;
-  }
-
   // Day groups, newest first, omitting empty days.
   let groups = $derived.by(() => {
     return [...store.visibleDays]
@@ -67,7 +64,7 @@
         entries = entries.sort(
           (a, b) => new Date(b.start).getTime() - new Date(a.start).getTime(),
         );
-        const total = entries.reduce((s, e) => s + durationMin(e), 0);
+        const total = entries.reduce((s, e) => s + entryDurationMin(e), 0);
         return { dayISO, entries, total };
       })
       .filter((g) => g.entries.length > 0);
@@ -79,15 +76,6 @@
       month: 'short',
       day: 'numeric',
     });
-  }
-
-  function projectFor(e) {
-    return e.projectId ? store.projectsById.get(e.projectId) : null;
-  }
-  function tagNames(e) {
-    return (e.tagIds ?? [])
-      .map((id) => store.tagsById.get(id)?.name)
-      .filter(Boolean);
   }
 
   function select(id, event) {
@@ -150,7 +138,7 @@
         </header>
 
         {#each g.entries as e (e.id)}
-          {@const project = projectFor(e)}
+          {@const project = entryProject(e, store.projectsById)}
           <button class="row" class:selected={selectedId === e.id} onclick={(ev) => select(e.id, ev)}>
             <span
               class="dot"
@@ -159,7 +147,7 @@
             <span class="desc">{e.description || 'No description'}</span>
 
             <span class="tags">
-              {#each tagNames(e) as name (name)}
+              {#each entryTagNames(e, store.tagsById) as name (name)}
                 <span class="tag">{name}</span>
               {/each}
             </span>
@@ -175,7 +163,7 @@
                 dateToMinutes(e.end),
               )}
             </span>
-            <span class="dur">{formatDuration(durationMin(e))}</span>
+            <span class="dur">{formatDuration(entryDurationMin(e))}</span>
           </button>
         {/each}
       </section>

@@ -1,5 +1,6 @@
 <script>
   import { startOfDay } from '../lib/time.js';
+  import { autofocus } from '../lib/actions.js';
   import TagCombobox from './TagCombobox.svelte';
 
   /**
@@ -51,12 +52,6 @@
     d.setHours(h, m, 0, 0);
     return d.toISOString();
   }
-
-  /** Focus the field when the editor opens. */
-  function autofocus(node) {
-    node.focus();
-    node.select?.();
-  }
 </script>
 
 <div
@@ -72,7 +67,7 @@
     placeholder="Description"
     value={entry.description}
     oninput={(e) => onChange?.({ description: e.currentTarget.value })}
-    use:autofocus
+    use:autofocus={{ select: true }}
   />
 
   <label class="row">

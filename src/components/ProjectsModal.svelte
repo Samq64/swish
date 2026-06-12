@@ -1,5 +1,6 @@
 <script>
   import { store } from '../data/store.js';
+  import { filterByName } from '../lib/search.js';
 
   /** Modal for managing projects: rename, recolor, add and delete. */
   let { onClose } = $props();
@@ -17,11 +18,7 @@
   ];
 
   let query = $state('');
-  let filtered = $derived(
-    store.projects.filter((p) =>
-      p.name.toLowerCase().includes(query.trim().toLowerCase()),
-    ),
-  );
+  let filtered = $derived(filterByName(store.projects, query));
 
   function addProject() {
     const color = PALETTE[store.projects.length % PALETTE.length];

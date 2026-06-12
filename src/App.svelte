@@ -1,6 +1,7 @@
 <script>
   import { store } from './data/store.js';
-  import { formatDuration, addDays } from './lib/time.js';
+  import { formatDuration } from './lib/time.js';
+  import { entryDurationMin } from './lib/entries.js';
   import TimerBar from './components/TimerBar.svelte';
   import WorkspaceSelector from './components/WorkspaceSelector.svelte';
   import TimelineView from './components/TimelineView.svelte';
@@ -34,12 +35,7 @@
   let totalMin = $derived(
     store.entries
       .filter((e) => e.end)
-      .reduce(
-        (sum, e) =>
-          sum +
-          (new Date(e.end).getTime() - new Date(e.start).getTime()) / 60000,
-        0,
-      ),
+      .reduce((sum, e) => sum + entryDurationMin(e), 0),
   );
 </script>
 
