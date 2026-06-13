@@ -8,7 +8,7 @@
    * workspaces — plus Settings and Log out. Creating, renaming, exporting,
    * importing and deleting workspaces live in the Settings modal.
    */
-  let { onOpenSettings } = $props();
+  let { onOpenSettings, onManageWorkspaces } = $props();
 
   let open = $state(false);
 
@@ -21,9 +21,9 @@
     open = false;
   }
 
-  function settings() {
+  function run(fn) {
     open = false;
-    onOpenSettings?.();
+    fn?.();
   }
 </script>
 
@@ -55,11 +55,14 @@
       </div>
 
       <div class="menu">
-        <button class="menu-item" onclick={settings}>
+        <button class="menu-item" onclick={() => run(onManageWorkspaces)}>
+          <Icon name="folder" size={15} /> Manage workspaces
+        </button>
+        <button class="menu-item" onclick={() => run(onOpenSettings)}>
           <Icon name="settings" size={15} /> Settings
         </button>
         <button class="menu-item" onclick={() => store.logout()}>
-          <Icon name="log-out" size={15} /> Log out
+          <Icon name="log-out" size={15} /> Log out {store.currentUser?.username ?? ''}
         </button>
       </div>
     </div>

@@ -2,13 +2,8 @@
   import { store } from '../data/store.js';
   import Icon from '../lib/Icon.svelte';
 
-  /**
-   * Account & workspace settings: manage workspaces (create, rename, export,
-   * import, delete), change password, sign out other sessions, delete account.
-   */
+  /** Account settings: change password, sign out other sessions, delete account. */
   let { onClose } = $props();
-
-  let fileInput = $state();
 
   // change password
   let currentPassword = $state('');
@@ -26,55 +21,6 @@
   let deleteBusy = $state(false);
   let deleteError = $state('');
 
-  // --- workspaces ---
-  function renameWorkspace(w, value, el) {
-    const name = value.trim();
-    const dup = store.workspaces.some(
-      (x) => x.id !== w.id && x.name.toLowerCase() === name.toLowerCase(),
-    );
-    if (!name || dup) {
-      el.value = w.name; // revert empty/duplicate
-      return;
-    }
-    store.renameWorkspace(w.id, name);
-  }
-
-  async function downloadWorkspace(w) {
-    const data = await store.exportWorkspace(w.id);
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(w.name || 'workspace').replace(/[^\w-]+/g, '-').toLowerCase()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function removeWorkspace(w) {
-    if (store.workspaces.length <= 1) return;
-    if (!confirm(`Delete “${w.name}” and all its entries? This can't be undone.`))
-      return;
-    await store.deleteWorkspace(w.id);
-  }
-
-  async function onImportFile(e) {
-    const file = e.currentTarget.files?.[0];
-    e.currentTarget.value = '';
-    if (!file) return;
-    try {
-      const payload = JSON.parse(await file.text());
-      if (payload?.type !== 'swish.workspace') {
-        throw new Error('Not a swish workspace export');
-      }
-      await store.importWorkspace(payload);
-    } catch {
-      alert('Could not import: the file is not a valid workspace export.');
-    }
-  }
-
-  // --- account ---
   async function submitPassword() {
     if (pwBusy) return;
     pwError = '';
@@ -141,55 +87,6 @@
     </header>
 
     <div class="body">
-      <section class="section">
-        <h3>Workspaces</h3>
-        <div class="ws-list">
-          {#each store.workspaces as w (w.id)}
-            <div class="ws-row">
-              <input
-                class="ws-name"
-                type="text"
-                value={w.name}
-                aria-label="Workspace name"
-                onchange={(e) => renameWorkspace(w, e.currentTarget.value, e.currentTarget)}
-              />
-              <button
-                class="icon-btn"
-                title="Export"
-                aria-label="Export {w.name}"
-                onclick={() => downloadWorkspace(w)}
-              >
-                <Icon name="download" size={15} />
-              </button>
-              <button
-                class="icon-btn danger"
-                title="Delete"
-                aria-label="Delete {w.name}"
-                disabled={store.workspaces.length <= 1}
-                onclick={() => removeWorkspace(w)}
-              >
-                <Icon name="trash-2" size={15} />
-              </button>
-            </div>
-          {/each}
-        </div>
-        <div class="ws-actions">
-          <button class="btn" onclick={() => store.addWorkspace('New workspace')}>
-            <Icon name="plus" size={15} /> New workspace
-          </button>
-          <button class="btn" onclick={() => fileInput.click()}>
-            <Icon name="upload" size={15} /> Import
-          </button>
-        </div>
-        <input
-          type="file"
-          accept="application/json,.json"
-          bind:this={fileInput}
-          onchange={onImportFile}
-          hidden
-        />
-      </section>
-
       <section class="section">
         <h3>Account</h3>
         <p class="account-line">
@@ -318,49 +215,6 @@
     font-size: 13px;
     color: var(--muted);
   }
-
-  .ws-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .ws-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .ws-name {
-    flex: 1;
-    min-width: 0;
-  }
-  .icon-btn {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    cursor: pointer;
-  }
-  .icon-btn:hover:not(:disabled) {
-    background: var(--bg);
-    color: var(--text);
-  }
-  .icon-btn.danger:hover:not(:disabled) {
-    color: #d63031;
-  }
-  .icon-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-  .ws-actions {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-  }
-
   input {
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -405,8 +259,10 @@
     border-color: #d63031;
     color: #d63031;
   }
+  /* Theme-adaptive tint so the hover reads correctly in light and dark
+     (the old hard-coded light pink looked wrong on the dark surface). */
   .btn.delete:hover:not(:disabled) {
-    background: #fdecea;
+    background: color-mix(in srgb, #d63031 14%, var(--surface));
   }
   .msg {
     margin: 0;
