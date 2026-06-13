@@ -11,6 +11,7 @@ const PROJECTS_KEY = 'swish.projects.v1';
 const TAGS_KEY = 'swish.tags.v1';
 const WORKSPACES_KEY = 'swish.workspaces.v1';
 const ACTIVE_KEY = 'swish.activeWorkspace.v1';
+const ONBOARDED_KEY = 'swish.onboarded.v1';
 
 const DEFAULT_WORKSPACE = { id: 'w_default', name: 'Workspace' };
 
@@ -230,6 +231,16 @@ export function createLocalRepository() {
     async setActiveWorkspaceId(id) {
       await tick();
       write(ACTIVE_KEY, id);
+    },
+
+    async getOnboarded() {
+      await tick();
+      return read(ONBOARDED_KEY, false) === true;
+    },
+
+    async setOnboarded() {
+      await tick();
+      write(ONBOARDED_KEY, true);
     },
 
     async exportWorkspace(workspaceId) {

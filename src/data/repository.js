@@ -52,6 +52,8 @@
  * @property {(id: string) => Promise<void>} deleteWorkspace
  * @property {() => Promise<string>} getActiveWorkspaceId
  * @property {(id: string) => Promise<void>} setActiveWorkspaceId
+ * @property {() => Promise<boolean>} getOnboarded
+ * @property {() => Promise<void>} setOnboarded
  * @property {(workspaceId: string) => Promise<WorkspaceExport>} exportWorkspace
  * @property {(payload: WorkspaceExport) => Promise<Workspace>} importWorkspace
  *

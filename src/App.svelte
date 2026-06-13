@@ -8,6 +8,7 @@
   import ListView from './components/ListView.svelte';
   import ProjectsModal from './components/ProjectsModal.svelte';
   import TagsModal from './components/TagsModal.svelte';
+  import OnboardingModal from './components/OnboardingModal.svelte';
 
   store.init();
 
@@ -115,6 +116,9 @@
 {/if}
 {#if showTags}
   <TagsModal onClose={() => (showTags = false)} />
+{/if}
+{#if !store.onboarded}
+  <OnboardingModal onClose={() => store.dismissOnboarding()} />
 {/if}
 
 <style>

@@ -21,6 +21,8 @@ export class AppStore {
   workspaces = $state([]);
   /** Id of the workspace whose data is currently loaded. */
   currentWorkspaceId = $state(null);
+  /** Whether the user has seen onboarding (defaults true to avoid a flash). */
+  onboarded = $state(true);
   /** 'week' | 'day' | 'list' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
@@ -65,13 +67,23 @@ export class AppStore {
   runningEntry = $derived(this.entries.find((e) => e.end === null) ?? null);
 
   async init() {
-    this.workspaces = await this.#repo.listWorkspaces();
-    const active = await this.#repo.getActiveWorkspaceId();
+    const [workspaces, active, onboarded] = await Promise.all([
+      this.#repo.listWorkspaces(),
+      this.#repo.getActiveWorkspaceId(),
+      this.#repo.getOnboarded(),
+    ]);
+    this.workspaces = workspaces;
+    this.onboarded = onboarded;
     this.currentWorkspaceId =
-      this.workspaces.find((w) => w.id === active)?.id ??
-      this.workspaces[0]?.id ??
+      workspaces.find((w) => w.id === active)?.id ??
+      workspaces[0]?.id ??
       null;
     await this.loadWorkspaceData();
+  }
+
+  async dismissOnboarding() {
+    this.onboarded = true;
+    await this.#repo.setOnboarded();
   }
 
   /** Load every dataset (projects, tags, entries) for the current workspace. */
