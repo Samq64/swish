@@ -516,5 +516,65 @@ async function handleAuth(ctx, rest, method) {
     return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
   }
 
+  // The remaining auth actions operate on the signed-in account.
+  const user = await resolveUser(env, request);
+  if (!user) return error(401, 'Not authenticated');
+
+  if (action === 'logout-others' && method === 'POST') {
+    // Revoke every session except this one — the current device stays signed in.
+    const token = readSessionCookie(request);
+    const currentSid = token ? await sha256b64url(token) : '';
+    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
+      .bind(user.id, currentSid)
+      .run();
+    return json({ ok: true });
+  }
+
+  if (action === 'password' && method === 'POST') {
+    const body = (await readJson(request)) || {};
+    const newPassword = body.newPassword ?? '';
+    if (newPassword.length < 8) return error(400, 'New password must be at least 8 characters');
+    const cur = await env.DB.prepare(
+      'SELECT pw_hash, pw_salt, pw_iterations FROM users WHERE id = ?',
+    )
+      .bind(user.id)
+      .first();
+    const ok = await verifyPassword(
+      body.currentPassword ?? '',
+      { hash: cur.pw_hash, salt: cur.pw_salt, iterations: cur.pw_iterations },
+      env.PEPPER,
+    );
+    if (!ok) return error(403, 'Current password is incorrect');
+    const pw = await hashPassword(newPassword, env.PEPPER);
+    // Keep this session; revoke every other one as a precaution.
+    const token = readSessionCookie(request);
+    const currentSid = token ? await sha256b64url(token) : '';
+    await env.DB.batch([
+      env.DB
+        .prepare('UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iterations = ? WHERE id = ?')
+        .bind(pw.hash, pw.salt, pw.iterations, user.id),
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(user.id, currentSid),
+    ]);
+    return json({ ok: true });
+  }
+
+  if (action === 'account' && method === 'DELETE') {
+    const body = (await readJson(request)) || {};
+    const cur = await env.DB.prepare(
+      'SELECT pw_hash, pw_salt, pw_iterations FROM users WHERE id = ?',
+    )
+      .bind(user.id)
+      .first();
+    const ok = await verifyPassword(
+      body.password ?? '',
+      { hash: cur.pw_hash, salt: cur.pw_salt, iterations: cur.pw_iterations },
+      env.PEPPER,
+    );
+    if (!ok) return error(403, 'Password is incorrect');
+    // FK cascade drops the user's sessions, workspaces, projects, tags, entries.
+    await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
+    return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
+  }
+
   return error(404, 'Not found');
 }

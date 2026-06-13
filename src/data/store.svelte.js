@@ -111,13 +111,34 @@ export class AppStore {
     try {
       await this.#repo.logout();
     } finally {
-      this.currentUser = null;
-      this.entries = [];
-      this.projects = [];
-      this.tags = [];
-      this.workspaces = [];
-      this.currentWorkspaceId = null;
+      this.#reset();
     }
+  }
+
+  /** Sign out every other session, keeping this one active. */
+  logoutOtherSessions() {
+    return this.#repo.logoutOthers();
+  }
+
+  /** Change the password; other sessions are revoked server-side. */
+  changePassword(currentPassword, newPassword) {
+    return this.#repo.changePassword(currentPassword, newPassword);
+  }
+
+  /** Permanently delete the account and all its data, then drop to login. */
+  async deleteAccount(password) {
+    await this.#repo.deleteAccount(password);
+    this.#reset();
+  }
+
+  /** Clear all per-user state (back to the logged-out shell). */
+  #reset() {
+    this.currentUser = null;
+    this.entries = [];
+    this.projects = [];
+    this.tags = [];
+    this.workspaces = [];
+    this.currentWorkspaceId = null;
   }
 
   /** Load every dataset (projects, tags, entries) for the current workspace. */

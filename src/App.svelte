@@ -11,11 +11,13 @@
   import ProjectsModal from './components/ProjectsModal.svelte';
   import TagsModal from './components/TagsModal.svelte';
   import AuthView from './components/AuthView.svelte';
+  import SettingsModal from './components/SettingsModal.svelte';
 
   store.bootstrap();
 
   let showProjects = $state(false);
   let showTags = $state(false);
+  let showSettings = $state(false);
 
   // Range label: a single day, or "Jun 7 – 13" for a week (month always first).
   let rangeLabel = $derived.by(() => {
@@ -64,7 +66,7 @@
   <AuthView />
 {:else}
 <header class="topbar">
-  <WorkspaceSelector />
+  <WorkspaceSelector onOpenSettings={() => (showSettings = true)} />
   <div class="timer-slot"><TimerBar /></div>
   <div class="topbar-actions">
     <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
@@ -130,6 +132,9 @@
 {/if}
 {#if showTags}
   <TagsModal onClose={() => (showTags = false)} />
+{/if}
+{#if showSettings}
+  <SettingsModal onClose={() => (showSettings = false)} />
 {/if}
 {/if}
 

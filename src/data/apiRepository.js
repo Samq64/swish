@@ -47,7 +47,11 @@ export function createApiRepository() {
     register: (username, password) => post('/auth/register', { username, password }),
     login: (username, password) => post('/auth/login', { username, password }),
     logout: () => post('/auth/logout'),
+    logoutOthers: () => post('/auth/logout-others'),
     me: () => get('/auth/me'),
+    changePassword: (currentPassword, newPassword) =>
+      post('/auth/password', { currentPassword, newPassword }),
+    deleteAccount: (password) => request('DELETE', '/auth/account', { password }),
 
     // --- entries ---
     listEntries: ({ from, to, workspaceId }) =>
