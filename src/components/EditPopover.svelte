@@ -123,6 +123,7 @@
     position: fixed;
     z-index: 50;
     width: 240px;
+    max-width: calc(100vw - 16px);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);

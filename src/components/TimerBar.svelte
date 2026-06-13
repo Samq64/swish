@@ -60,6 +60,7 @@
 <style>
   .timer-bar {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -70,6 +71,7 @@
   }
   .desc {
     flex: 1;
+    min-width: 0;
     border: none;
     outline: none;
     font-size: 15px;

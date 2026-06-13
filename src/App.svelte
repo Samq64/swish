@@ -54,7 +54,7 @@
 
 <header class="topbar">
   <WorkspaceSelector />
-  <TimerBar />
+  <div class="timer-slot"><TimerBar /></div>
   <div class="topbar-actions">
     <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
     <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
@@ -141,6 +141,14 @@
   .topbar-actions {
     display: flex;
     gap: var(--space-2);
+    flex: none;
+  }
+  /* The timer absorbs the topbar's spare/short space so the buttons keep
+     their size; min-width:0 lets it actually shrink (not just its input). */
+  .timer-slot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
   }
   /* Match the taller timer bar so the header controls line up. */
   .topbar-actions .nav-btn {
@@ -185,6 +193,9 @@
     font-size: 16px;
     font-weight: 600;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .view-toggle {
@@ -200,6 +211,9 @@
     padding: var(--space-1) var(--space-3);
     color: var(--muted);
     font-weight: 600;
+  }
+  .view-toggle button + button {
+    border-left: 1px solid var(--border);
   }
   .view-toggle button.active {
     background: var(--accent);
@@ -222,5 +236,37 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  /* Day-nav: drop the view toggle to its own full-width row before the
+     single-row layout gets cramped enough to elide the date range. The left
+     group also wraps so the date nav + range + total never overflow. */
+  @media (max-width: 768px) {
+    .day-nav {
+      flex-wrap: wrap;
+      row-gap: var(--space-2);
+    }
+    .nav-left {
+      flex-wrap: wrap;
+      flex-basis: 100%;
+    }
+    .view-toggle {
+      flex: 1;
+    }
+    .view-toggle button {
+      flex: 1;
+    }
+  }
+
+  /* Phone: workspace + Projects/Tags on the first row, timer full-width below
+     (gutters tighten in app.css; the timeline scrolls sideways). */
+  @media (max-width: 640px) {
+    .topbar {
+      flex-wrap: wrap;
+    }
+    .timer-slot {
+      order: 3;
+      flex-basis: 100%;
+    }
   }
 </style>

@@ -385,4 +385,11 @@
     font-size: 14px;
     padding: var(--space-5) 0;
   }
+
+  /* Reclaim row width on phones: drop the start–end times (duration stays). */
+  @media (max-width: 640px) {
+    .range {
+      display: none;
+    }
+  }
 </style>

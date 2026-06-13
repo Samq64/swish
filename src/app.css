@@ -44,3 +44,10 @@ select {
   font: inherit;
   color: inherit;
 }
+
+/* Tighter gutters on small screens — shrinks every --space-5 container pad. */
+@media (max-width: 640px) {
+  :root {
+    --space-5: 12px;
+  }
+}

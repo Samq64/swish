@@ -96,23 +96,65 @@
 
   // --- gesture starts --------------------------------------------------------
 
-  function beginCreate(event) {
-    if (event.button != null && event.button !== 0) return;
-    // Let touch gestures scroll the timeline natively instead of drawing an
-    // entry. (Move/resize still works on touch — those start on an entry.)
-    if (event.pointerType === 'touch') return;
-    const m = snap(pointerMinutes(event));
+  // Touch: a swipe should scroll, so creating is gated behind a long-press.
+  const LONG_PRESS_MS = 400;
+  const MOVE_CANCEL_PX = 10;
+  const DEFAULT_CREATE_MIN = 30;
+  let pressTimer = null;
+  let pressStart = null; // { pointerId, clientX, clientY } while awaiting hold
+
+  function cancelLongPress() {
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = null;
+    pressStart = null;
+  }
+
+  // Drop a fresh create gesture anchored at `anchorMin`, sized to `endMin`.
+  function startCreate(event, anchorMin, endMin = anchorMin) {
     drag = {
       mode: 'create',
       entryId: null,
-      anchorMin: m,
+      anchorMin,
       grabOffsetMin: 0,
       duration: 0,
-      startMin: m,
-      endMin: m,
+      startMin: Math.min(anchorMin, endMin),
+      endMin: Math.max(anchorMin, endMin),
       moved: false,
     };
-    capture(event);
+    gridEl.setPointerCapture?.(event.pointerId);
+  }
+
+  function beginCreate(event) {
+    if (event.button != null && event.button !== 0) return;
+    if (event.pointerType === 'touch') {
+      // Wait for a hold before grabbing; a finger-move first = scroll.
+      cancelLongPress();
+      pressStart = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        if (!gridEl || !pressStart) return;
+        const m = clamp(
+          pxToMinutes(pressStart.clientY - gridEl.getBoundingClientRect().top),
+          0,
+          MINUTES_PER_DAY,
+        );
+        const start = clamp(snap(m), 0, MINUTES_PER_DAY - DEFAULT_CREATE_MIN);
+        startCreate({ pointerId: pressStart.pointerId }, start, start + DEFAULT_CREATE_MIN);
+        navigator.vibrate?.(10);
+        pressStart = null;
+      }, LONG_PRESS_MS);
+      return;
+    }
+    startCreate(event, snap(pointerMinutes(event)));
+  }
+
+  // Block the page from scrolling once a drag is live (touch).
+  function onTouchMove(event) {
+    if (drag) event.preventDefault();
   }
 
   function beginEntryDrag(entry, mode, event) {
@@ -136,6 +178,16 @@
   // --- live drag -------------------------------------------------------------
 
   function onPointerMove(event) {
+    // Awaiting a long-press: a real move means the user is scrolling, not
+    // creating — abandon the pending hold and let the timeline scroll.
+    if (pressStart && !drag) {
+      const moved = Math.hypot(
+        event.clientX - pressStart.clientX,
+        event.clientY - pressStart.clientY,
+      );
+      if (moved > MOVE_CANCEL_PX) cancelLongPress();
+      return;
+    }
     if (!drag) return;
     const m = pointerMinutes(event);
     const snapped = snap(m);
@@ -176,6 +228,7 @@
   // --- commit ----------------------------------------------------------------
 
   async function onPointerUp(event) {
+    cancelLongPress();
     if (!drag) return;
     const d = drag;
     drag = null;
@@ -212,6 +265,8 @@
 
   // "now" indicator, only on today's column; one shared ticker for all columns.
   $effect(() => clock.subscribe());
+  // Drop any pending long-press if this column unmounts mid-hold.
+  $effect(() => cancelLongPress);
   let isToday = $derived(
     startOfDay(dayISO).getTime() === startOfDay(new Date()).getTime(),
   );
@@ -243,6 +298,7 @@
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
   onpointercancel={onPointerUp}
+  ontouchmove={onTouchMove}
 >
   {#each hours as h (h)}
     <div class="hour-line" style:top="{minutesToPx(h * 60)}px"></div>
@@ -323,5 +379,13 @@
     height: 8px;
     border-radius: 50%;
     background: #e74c3c;
+  }
+
+  /* Keep week columns usable on phones (matches .day-head); the timeline
+     scrolls sideways rather than squeezing them to nothing. */
+  @media (max-width: 640px) {
+    .grid {
+      min-width: 84px;
+    }
   }
 </style>

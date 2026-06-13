@@ -180,4 +180,15 @@
   .hour-label.first {
     transform: translateY(2px);
   }
+
+  /* On phones, 7 week columns are too thin — give them a floor and let the
+     timeline scroll sideways instead of squeezing. Header scrolls in sync. */
+  @media (max-width: 640px) {
+    .scroll {
+      overflow-x: auto;
+    }
+    .day-head {
+      min-width: 84px;
+    }
+  }
 </style>

@@ -201,6 +201,7 @@
   .name {
     font-weight: 700;
     font-size: 15px;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -268,13 +269,6 @@
     align-items: center;
     gap: var(--space-1);
     padding-right: var(--space-1);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .option:hover .row-actions,
-  .option:focus-within .row-actions {
-    opacity: 1;
-    pointer-events: auto;
   }
   .row-actions button {
     border: none;
