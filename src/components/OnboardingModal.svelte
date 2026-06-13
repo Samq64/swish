@@ -21,29 +21,18 @@
 >
   <div class="modal" role="dialog" aria-modal="true" aria-label="Welcome">
     <header class="head">
-      <h2>Welcome</h2>
+      <h2>Welcome!</h2>
     </header>
 
     <div class="body">
       <p>
-        This app keeps everything — time entries, projects, tags and
-        workspaces — in <strong>this browser's local storage</strong>. There's
+        This app keeps everything including time entries, projects, tags and
+        workspaces in this browser's local storage. There is
         no account, and nothing is sent to a server.
       </p>
-      <ul>
-        <li>
-          Your data stays on <strong>this device and browser only</strong> — it
-          won't sync to your phone or other browsers.
-        </li>
-        <li>
-          <strong>Clearing your browser data erases it</strong>, and there's no
-          cloud backup.
-        </li>
-      </ul>
       <p class="tip">
-        To back up or move your data, open the <strong>workspace menu</strong>
-        (top-left) and choose <strong>Export</strong> to download a JSON file.
-        <strong>Import</strong> brings it back — on this browser or another.
+        To back up or move your data, export it from the workspace menu in the
+        top-left.
       </p>
     </div>
 
@@ -91,13 +80,6 @@
   }
   .body p {
     margin: 0 0 var(--space-3);
-  }
-  .body ul {
-    margin: 0 0 var(--space-3);
-    padding-left: var(--space-4);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
   }
   .tip {
     background: var(--bg);
