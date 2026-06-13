@@ -12,16 +12,7 @@ const TAGS_KEY = 'swish.tags.v1';
 const WORKSPACES_KEY = 'swish.workspaces.v1';
 const ACTIVE_KEY = 'swish.activeWorkspace.v1';
 
-const DEFAULT_WORKSPACE = { id: 'w_default', name: 'My Workspace' };
-
-const DEFAULT_PROJECTS = [
-  { id: 'p_focus', workspaceId: DEFAULT_WORKSPACE.id, name: 'Deep Work', color: '#6c5ce7' },
-];
-
-const DEFAULT_TAGS = [
-  { id: 't_billable', workspaceId: DEFAULT_WORKSPACE.id, name: 'billable' },
-  { id: 't_meeting', workspaceId: DEFAULT_WORKSPACE.id, name: 'meeting' },
-];
+const DEFAULT_WORKSPACE = { id: 'w_default', name: 'Workspace' };
 
 function read(key, fallback) {
   try {
@@ -39,15 +30,21 @@ function write(key, value) {
 /** Simulate async I/O so calling code is written against real latency. */
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** `base`, or `base (2)`, `base (3)`… — whichever is not already in `taken`. */
+function uniqueName(base, taken) {
+  const set = new Set(taken);
+  if (!set.has(base)) return base;
+  let n = 2;
+  while (set.has(`${base} (${n})`)) n++;
+  return `${base} (${n})`;
+}
+
 export function createLocalRepository() {
+  // Only a workspace must exist up front; projects and tags start empty and a
+  // missing key already reads as []. Seeding the default workspace also keeps
+  // createWorkspace from dropping it on the first add.
   if (read(WORKSPACES_KEY, null) === null) {
     write(WORKSPACES_KEY, [DEFAULT_WORKSPACE]);
-  }
-  if (read(PROJECTS_KEY, null) === null) {
-    write(PROJECTS_KEY, DEFAULT_PROJECTS);
-  }
-  if (read(TAGS_KEY, null) === null) {
-    write(TAGS_KEY, DEFAULT_TAGS);
   }
   if (read(ACTIVE_KEY, null) === null) {
     write(ACTIVE_KEY, DEFAULT_WORKSPACE.id);
@@ -103,9 +100,7 @@ export function createLocalRepository() {
 
     async listProjects(workspaceId) {
       await tick();
-      return read(PROJECTS_KEY, DEFAULT_PROJECTS).filter(
-        (p) => p.workspaceId === workspaceId,
-      );
+      return read(PROJECTS_KEY, []).filter((p) => p.workspaceId === workspaceId);
     },
 
     async createProject(data) {
@@ -143,9 +138,7 @@ export function createLocalRepository() {
 
     async listTags(workspaceId) {
       await tick();
-      return read(TAGS_KEY, DEFAULT_TAGS).filter(
-        (t) => t.workspaceId === workspaceId,
-      );
+      return read(TAGS_KEY, []).filter((t) => t.workspaceId === workspaceId);
     },
 
     async createTag(data) {
@@ -237,6 +230,75 @@ export function createLocalRepository() {
     async setActiveWorkspaceId(id) {
       await tick();
       write(ACTIVE_KEY, id);
+    },
+
+    async exportWorkspace(workspaceId) {
+      await tick();
+      const ws = read(WORKSPACES_KEY, []).find((w) => w.id === workspaceId);
+      if (!ws) throw new Error(`No workspace ${workspaceId}`);
+      // Keep records' own ids (so entries can reference projects/tags) but drop
+      // workspaceId — the importer assigns a fresh workspace.
+      const own = (key) =>
+        read(key, [])
+          .filter((it) => it.workspaceId === workspaceId)
+          .map(({ workspaceId: _ignored, ...rest }) => rest);
+      return {
+        type: 'swish.workspace',
+        version: 1,
+        workspace: { name: ws.name },
+        projects: own(PROJECTS_KEY),
+        tags: own(TAGS_KEY),
+        entries: own(ENTRIES_KEY),
+      };
+    },
+
+    async importWorkspace(payload) {
+      await tick();
+      const workspaces = read(WORKSPACES_KEY, []);
+      const ws = {
+        id: newId('w'),
+        name: uniqueName(
+          payload?.workspace?.name?.trim() || 'Imported workspace',
+          workspaces.map((w) => w.name),
+        ),
+      };
+      write(WORKSPACES_KEY, [...workspaces, ws]);
+
+      // Re-create projects and tags with fresh ids, tracking old -> new so
+      // entries can be re-pointed at them.
+      const projectIds = new Map();
+      const projects = read(PROJECTS_KEY, []);
+      for (const p of payload?.projects ?? []) {
+        const id = newId('p');
+        projectIds.set(p.id, id);
+        projects.push({ id, workspaceId: ws.id, name: p.name ?? 'Project', color: p.color });
+      }
+      write(PROJECTS_KEY, projects);
+
+      const tagIds = new Map();
+      const tags = read(TAGS_KEY, []);
+      for (const t of payload?.tags ?? []) {
+        const id = newId('t');
+        tagIds.set(t.id, id);
+        tags.push({ id, workspaceId: ws.id, name: t.name ?? 'tag' });
+      }
+      write(TAGS_KEY, tags);
+
+      const entries = read(ENTRIES_KEY, []);
+      for (const e of payload?.entries ?? []) {
+        entries.push({
+          id: newId(),
+          workspaceId: ws.id,
+          description: e.description ?? '',
+          projectId: e.projectId != null ? (projectIds.get(e.projectId) ?? null) : null,
+          tagIds: (e.tagIds ?? []).map((id) => tagIds.get(id)).filter(Boolean),
+          start: e.start,
+          end: e.end ?? null,
+        });
+      }
+      write(ENTRIES_KEY, entries);
+
+      return ws;
     },
   };
 }

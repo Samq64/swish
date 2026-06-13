@@ -11,6 +11,8 @@
   let open = $state(false);
   let creating = $state(false);
   let newName = $state('');
+  let renamingId = $state(null);
+  let renameName = $state('');
 
   function initial(name) {
     return (name ?? '?').trim().slice(0, 1).toUpperCase() || '?';
@@ -20,6 +22,8 @@
     open = false;
     creating = false;
     newName = '';
+    renamingId = null;
+    renameName = '';
   }
 
   function pick(id) {
@@ -32,6 +36,59 @@
     if (!name) return;
     await store.addWorkspace(name);
     close();
+  }
+
+  function startRename(w) {
+    renamingId = w.id;
+    renameName = w.name;
+  }
+
+  async function saveRename(id) {
+    const name = renameName.trim();
+    renamingId = null;
+    renameName = '';
+    if (name) await store.renameWorkspace(id, name);
+  }
+
+  let fileInput;
+
+  async function removeWorkspace(w) {
+    if (store.workspaces.length <= 1) return;
+    if (!confirm(`Delete “${w.name}” and all its entries? This can't be undone.`))
+      return;
+    await store.deleteWorkspace(w.id);
+  }
+
+  async function downloadWorkspace(w) {
+    const data = await store.exportWorkspace(w.id);
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(w.name || 'workspace')
+      .replace(/[^\w-]+/g, '-')
+      .toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    close();
+  }
+
+  async function onImportFile(e) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = ''; // allow re-picking the same file later
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      if (payload?.type !== 'swish.workspace') {
+        throw new Error('Not a swish workspace export');
+      }
+      await store.importWorkspace(payload);
+      close();
+    } catch {
+      alert('Could not import: the file is not a valid workspace export.');
+    }
   }
 </script>
 
@@ -52,17 +109,49 @@
       <div class="panel-label">Workspaces</div>
       <div class="options">
         {#each store.workspaces as w (w.id)}
-          <button
-            class="option"
-            class:current={w.id === store.currentWorkspaceId}
-            onclick={() => pick(w.id)}
-          >
-            <span class="avatar sm">{initial(w.name)}</span>
-            <span class="opt-name">{w.name}</span>
-            {#if w.id === store.currentWorkspaceId}
-              <span class="check">✓</span>
-            {/if}
-          </button>
+          {#if renamingId === w.id}
+            <input
+              class="rename-input"
+              type="text"
+              bind:value={renameName}
+              use:autofocus={{ select: true }}
+              onblur={() => saveRename(w.id)}
+              onkeydown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  saveRename(w.id);
+                } else if (e.key === 'Escape') {
+                  renamingId = null;
+                  renameName = '';
+                }
+              }}
+            />
+          {:else}
+            {@const isCurrent = w.id === store.currentWorkspaceId}
+            <div class="option" class:current={isCurrent}>
+              <button class="switch" onclick={() => pick(w.id)}>
+                <span class="check">{#if isCurrent}✓{/if}</span>
+                <span class="opt-name">{w.name}</span>
+              </button>
+              <div class="row-actions">
+                <button title="Rename" aria-label="Rename workspace" onclick={() => startRename(w)}>
+                  ✎
+                </button>
+                <button title="Export" aria-label="Export workspace" onclick={() => downloadWorkspace(w)}>
+                  ⭳
+                </button>
+                <button
+                  class="danger"
+                  title="Delete"
+                  aria-label="Delete workspace"
+                  disabled={store.workspaces.length <= 1}
+                  onclick={() => removeWorkspace(w)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          {/if}
         {/each}
       </div>
 
@@ -84,10 +173,18 @@
           }}
         />
       {:else}
-        <button class="add" onclick={() => (creating = true)}>
-          + New workspace
-        </button>
+        <div class="bottom">
+          <button onclick={() => fileInput.click()}>Import…</button>
+          <button onclick={() => (creating = true)}>+ New</button>
+        </div>
       {/if}
+      <input
+        type="file"
+        accept="application/json,.json"
+        bind:this={fileInput}
+        onchange={onImportFile}
+        hidden
+      />
     </div>
   {/if}
 </div>
@@ -99,11 +196,11 @@
   .trigger {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     border: 1px solid transparent;
     background: none;
-    border-radius: 8px;
-    padding: 4px 8px 4px 4px;
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
     cursor: pointer;
     max-width: 220px;
   }
@@ -115,7 +212,7 @@
     width: 28px;
     height: 28px;
     flex: none;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: white;
     font-weight: 700;
@@ -123,12 +220,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-  .avatar.sm {
-    width: 22px;
-    height: 22px;
-    font-size: 12px;
-    border-radius: 6px;
   }
   .name {
     font-weight: 700;
@@ -148,22 +239,22 @@
 
   .panel {
     position: absolute;
-    top: calc(100% + 6px);
+    top: calc(100% + var(--space-1));
     left: 0;
     z-index: 80;
     width: 240px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-    padding: 8px;
+    padding: var(--space-2);
   }
   .panel-label {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--muted);
-    padding: 4px 6px;
+    padding: var(--space-1) var(--space-2);
   }
   .options {
     max-height: 240px;
@@ -172,22 +263,62 @@
   .option {
     display: flex;
     align-items: center;
-    gap: 8px;
-    width: 100%;
-    text-align: left;
-    border: none;
-    background: none;
-    border-radius: 7px;
-    padding: 6px;
-    cursor: pointer;
-    font: inherit;
-    color: inherit;
+    border-radius: var(--radius-sm);
   }
   .option:hover {
     background: var(--bg);
   }
   .option.current {
     background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+  .switch {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding-right: var(--space-1);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .option:hover .row-actions,
+  .option:focus-within .row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .row-actions button {
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+  }
+  .row-actions button:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .row-actions button.danger:hover {
+    color: #d63031;
+  }
+  .row-actions button:disabled {
+    opacity: 0.3;
+    cursor: default;
   }
   .opt-name {
     flex: 1;
@@ -197,28 +328,45 @@
     text-overflow: ellipsis;
   }
   .check {
+    width: 14px;
+    flex: none;
+    text-align: center;
     color: var(--accent);
     font-weight: 700;
-  }
-  .add {
-    width: 100%;
-    text-align: left;
-    border: none;
-    background: none;
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 14px;
-    padding: 8px 6px 4px;
-    margin-top: 4px;
-    border-top: 1px solid var(--border);
-    cursor: pointer;
   }
   .new-input {
     width: 100%;
     border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 7px 8px;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     font-size: 14px;
-    margin-top: 6px;
+    margin-top: var(--space-2);
+  }
+  .rename-input {
+    width: 100%;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: var(--space-2);
+    font-size: 14px;
+  }
+  .bottom {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+  .bottom button {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: var(--space-2);
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .bottom button:hover {
+    background: var(--bg);
   }
 </style>

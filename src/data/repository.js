@@ -52,6 +52,16 @@
  * @property {(id: string) => Promise<void>} deleteWorkspace
  * @property {() => Promise<string>} getActiveWorkspaceId
  * @property {(id: string) => Promise<void>} setActiveWorkspaceId
+ * @property {(workspaceId: string) => Promise<WorkspaceExport>} exportWorkspace
+ * @property {(payload: WorkspaceExport) => Promise<Workspace>} importWorkspace
+ *
+ * @typedef {Object} WorkspaceExport
+ * @property {'swish.workspace'} type
+ * @property {number} version
+ * @property {{name: string}} workspace
+ * @property {Project[]} projects
+ * @property {Tag[]} tags
+ * @property {TimeEntry[]} entries
  */
 
 /** Generate a client-side id. A backend would assign its own on create. */

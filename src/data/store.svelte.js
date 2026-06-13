@@ -110,6 +110,35 @@ export class AppStore {
     return ws;
   }
 
+  renameWorkspace(id, name) {
+    return this.#patch('workspaces', id, { name }, (i, p) =>
+      this.#repo.updateWorkspace(i, p),
+    );
+  }
+
+  /** Delete a workspace and its data; refuses to remove the last one. */
+  async deleteWorkspace(id) {
+    if (this.workspaces.length <= 1) return;
+    await this.#repo.deleteWorkspace(id);
+    this.workspaces = this.workspaces.filter((w) => w.id !== id);
+    if (this.currentWorkspaceId === id) {
+      await this.switchWorkspace(this.workspaces[0].id);
+    }
+  }
+
+  /** Serializable snapshot of a workspace (defaults to the current one). */
+  exportWorkspace(id = this.currentWorkspaceId) {
+    return this.#repo.exportWorkspace(id);
+  }
+
+  /** Create a new workspace from an export payload and switch to it. */
+  async importWorkspace(payload) {
+    const ws = await this.#repo.importWorkspace(payload);
+    this.workspaces = await this.#repo.listWorkspaces();
+    await this.switchWorkspace(ws.id);
+    return ws;
+  }
+
   setView(view) {
     if (view === this.view) return;
     this.view = view;
