@@ -22,8 +22,13 @@ async function request(method, path, body) {
     headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  // Session gone/expired: bounce to the login route.
-  if (res.status === 401 && typeof window !== 'undefined') {
+  // Session gone/expired: bounce to the login route (guard against looping if
+  // we're somehow already there).
+  if (
+    res.status === 401 &&
+    typeof window !== 'undefined' &&
+    window.location.pathname !== '/login'
+  ) {
     window.location.assign('/login');
   }
   if (res.status === 204) return null;
