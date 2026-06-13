@@ -1,6 +1,7 @@
 <script>
   import { store } from '../data/store.js';
   import { formatDuration } from '../lib/time.js';
+  import Icon from '../lib/Icon.svelte';
 
   let description = $state('');
 
@@ -53,6 +54,7 @@
   />
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
   <button class="toggle" class:running type="submit">
+    <Icon name={running ? 'square' : 'play'} size={15} />
     {running ? 'Stop' : 'Start'}
   </button>
 </form>
@@ -87,9 +89,12 @@
     font-weight: 600;
   }
   .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     border: none;
     border-radius: var(--radius);
-    padding: var(--space-2) var(--space-5);
+    padding: var(--space-2) var(--space-4);
     font-weight: 600;
     color: white;
     background: var(--accent);

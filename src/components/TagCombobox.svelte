@@ -1,6 +1,7 @@
 <script>
   import { autofocus, clickOutside } from '../lib/actions.js';
   import { filterByName, hasExactName } from '../lib/search.js';
+  import Icon from '../lib/Icon.svelte';
 
   /**
    * A searchable tag picker: a trigger showing the assigned tags, which opens
@@ -45,7 +46,7 @@
     {:else}
       <span class="placeholder">Add tags…</span>
     {/if}
-    <span class="caret" class:open>▾</span>
+    <span class="caret" class:open><Icon name="chevron-down" size={16} /></span>
   </button>
 
   {#if open}
@@ -80,7 +81,7 @@
 
         {#if query.trim() && !exact}
           <button type="button" class="create" onclick={create}>
-            + Create “{query.trim()}”
+            <Icon name="plus" size={14} /> Create “{query.trim()}”
           </button>
         {:else if filtered.length === 0}
           <p class="none">No tags yet.</p>
@@ -113,7 +114,7 @@
     flex: 1;
   }
   .chip {
-    background: color-mix(in srgb, var(--accent) 15%, white);
+    background: color-mix(in srgb, var(--accent) 15%, var(--surface));
     color: var(--accent);
     border-radius: 999px;
     padding: 1px var(--space-2);
@@ -127,8 +128,8 @@
     font-size: 13px;
   }
   .caret {
+    display: inline-flex;
     color: var(--muted);
-    font-size: 11px;
     transition: transform 0.12s ease;
   }
   .caret.open {
@@ -176,7 +177,9 @@
   }
   .create {
     width: 100%;
-    text-align: left;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     border: none;
     background: none;
     color: var(--accent);

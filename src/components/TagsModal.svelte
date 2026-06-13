@@ -1,6 +1,7 @@
 <script>
   import { store } from '../data/store.js';
   import { filterByName } from '../lib/search.js';
+  import Icon from '../lib/Icon.svelte';
 
   /** Modal for managing global tags: rename, add and delete. */
   let { onClose } = $props();
@@ -26,7 +27,7 @@
     <header class="head">
       <h2>Tags</h2>
       <button class="close" aria-label="Close" onclick={() => onClose?.()}>
-        ×
+        <Icon name="x" size={18} />
       </button>
     </header>
 
@@ -56,7 +57,7 @@
             aria-label="Delete {t.name}"
             onclick={() => store.removeTag(t.id)}
           >
-            Delete
+            <Icon name="trash-2" size={16} />
           </button>
         </div>
       {/each}
@@ -70,7 +71,7 @@
 
     <footer class="foot">
       <button class="add" onclick={() => store.addTag({ name: 'new-tag' })}>
-        + Add tag
+        <Icon name="plus" size={15} /> Add tag
       </button>
       <button class="done" onclick={() => onClose?.()}>Done</button>
     </footer>
@@ -154,11 +155,13 @@
     font-size: 14px;
   }
   .delete {
+    display: inline-flex;
+    align-items: center;
     border: none;
     background: none;
     color: #d63031;
-    font-size: 13px;
     flex: none;
+    padding: var(--space-1);
   }
   .empty {
     color: var(--muted);
@@ -175,6 +178,9 @@
     border-top: 1px solid var(--border);
   }
   .add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     border: 1px dashed var(--border);
     background: none;
     color: var(--accent);

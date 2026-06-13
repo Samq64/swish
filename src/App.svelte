@@ -2,6 +2,7 @@
   import { store } from './data/store.js';
   import { formatDuration } from './lib/time.js';
   import { entryDurationMin } from './lib/entries.js';
+  import Icon from './lib/Icon.svelte';
   import TimerBar from './components/TimerBar.svelte';
   import WorkspaceSelector from './components/WorkspaceSelector.svelte';
   import TimelineView from './components/TimelineView.svelte';
@@ -65,7 +66,7 @@
 <nav class="day-nav">
   <div class="nav-left">
     <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
-      ‹
+      <Icon name="chevron-left" />
     </button>
     <input
       class="date-input"
@@ -75,7 +76,7 @@
       onchange={(e) => pickDate(e.currentTarget.value)}
     />
     <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
-      ›
+      <Icon name="chevron-right" />
     </button>
 
     {#if store.view !== 'day'}
@@ -174,6 +175,9 @@
     min-width: 0;
   }
   .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--border);
     background: var(--surface);
     border-radius: var(--radius);

@@ -1,6 +1,7 @@
 <script>
   import { store } from '../data/store.js';
   import { autofocus, clickOutside } from '../lib/actions.js';
+  import Icon from '../lib/Icon.svelte';
 
   /**
    * Replaces the static brand. Shows the active workspace and opens a dropdown
@@ -97,7 +98,7 @@
   >
     <span class="avatar">{initial(store.currentWorkspace?.name)}</span>
     <span class="name">{store.currentWorkspace?.name ?? 'Workspace'}</span>
-    <span class="caret" class:open>▾</span>
+    <span class="caret" class:open><Icon name="chevron-down" size={16} /></span>
   </button>
 
   {#if open}
@@ -126,15 +127,17 @@
             {@const isCurrent = w.id === store.currentWorkspaceId}
             <div class="option" class:current={isCurrent}>
               <button class="switch" onclick={() => pick(w.id)}>
-                <span class="check">{#if isCurrent}✓{/if}</span>
+                <span class="check">
+                  {#if isCurrent}<Icon name="check" size={14} />{/if}
+                </span>
                 <span class="opt-name">{w.name}</span>
               </button>
               <div class="row-actions">
                 <button title="Rename" aria-label="Rename workspace" onclick={() => startRename(w)}>
-                  ✎
+                  <Icon name="pencil" size={15} />
                 </button>
                 <button title="Export" aria-label="Export workspace" onclick={() => downloadWorkspace(w)}>
-                  ⭳
+                  <Icon name="download" size={15} />
                 </button>
                 <button
                   class="danger"
@@ -143,7 +146,7 @@
                   disabled={store.workspaces.length <= 1}
                   onclick={() => removeWorkspace(w)}
                 >
-                  ✕
+                  <Icon name="trash-2" size={15} />
                 </button>
               </div>
             </div>
@@ -152,8 +155,12 @@
       </div>
 
       <div class="bottom">
-        <button onclick={() => fileInput.click()}>Import…</button>
-        <button onclick={createNew}>+ New</button>
+        <button onclick={() => fileInput.click()}>
+          <Icon name="upload" size={15} /> Import
+        </button>
+        <button onclick={createNew}>
+          <Icon name="plus" size={15} /> New
+        </button>
       </div>
       <input
         type="file"
@@ -207,8 +214,8 @@
     text-overflow: ellipsis;
   }
   .caret {
+    display: inline-flex;
     color: var(--muted);
-    font-size: 11px;
     transition: transform 0.12s ease;
   }
   .caret.open {
@@ -321,6 +328,10 @@
   }
   .bottom button {
     flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
     border: 1px solid var(--border);
     background: var(--surface);
     border-radius: var(--radius);
