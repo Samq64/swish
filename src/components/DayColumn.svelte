@@ -349,8 +349,9 @@
     flex: 1;
     min-width: 0;
     border-left: 1px solid var(--border);
-    /* Allow native vertical scroll on touch; create-by-drag is mouse/pen only. */
-    touch-action: pan-y;
+    /* Let touch pan both ways (vertical hours + horizontal week scroll);
+       creating is gated behind a long-press, which preventDefaults the pan. */
+    touch-action: pan-x pan-y;
   }
   .hour-line {
     position: absolute;
