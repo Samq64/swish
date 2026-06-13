@@ -5,7 +5,9 @@ const te = new TextEncoder();
 
 const COOKIE_NAME = 'swish_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-const PBKDF2_ITERATIONS = 210_000; // OWASP 2023 floor for PBKDF2-HMAC-SHA256
+// The Cloudflare Workers runtime caps PBKDF2 at 100,000 iterations. We store
+// the count per user (pw_iterations), so this can rise later if the cap does.
+const PBKDF2_ITERATIONS = 100_000;
 
 // --- base64url ---------------------------------------------------------------
 
