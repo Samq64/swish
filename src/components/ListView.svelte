@@ -90,7 +90,7 @@
   <div class="filter-bar">
     <div class="filter-rows">
       <div class="filter-row">
-        <span class="filter-label">Project</span>
+        <span class="filter-label">Projects</span>
         {#each store.projects as p (p.id)}
           <button
             type="button"

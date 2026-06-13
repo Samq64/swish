@@ -44,7 +44,12 @@
     const name = renameName.trim();
     renamingId = null;
     renameName = '';
-    if (name) await store.renameWorkspace(id, name);
+    if (!name) return;
+    const isDuplicate = store.workspaces.some(
+      (w) => w.id !== id && w.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (isDuplicate) return;
+    await store.renameWorkspace(id, name);
   }
 
   let fileInput;

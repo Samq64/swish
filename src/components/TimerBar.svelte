@@ -1,6 +1,6 @@
 <script>
   import { store } from '../data/store.js';
-  import { formatDuration } from '../lib/time.js';
+  import { formatDuration, startOfDay } from '../lib/time.js';
   import Icon from '../lib/Icon.svelte';
 
   let description = $state('');
@@ -18,9 +18,22 @@
     running ? (now - new Date(running.start).getTime()) / 60000 : 0,
   );
 
+  // Sync description from the running entry; clear when there's none (handles
+  // workspace switches where the running entry changes or disappears).
   $effect(() => {
-    // Keep the input in sync when a running entry exists.
-    if (running) description = running.description;
+    store.currentWorkspaceId; // invalidate when workspace switches
+    description = store.runningEntry?.description ?? '';
+  });
+
+  // Auto-stop the timer at midnight if it was started on a previous day.
+  $effect(() => {
+    if (!running || !now) return;
+    const startDay = startOfDay(new Date(running.start));
+    const todayDay = startOfDay(new Date(now));
+    if (todayDay.getTime() > startDay.getTime()) {
+      const midnight = new Date(startDay.getTime() + 24 * 60 * 60 * 1000);
+      store.stop(running.id, midnight.toISOString());
+    }
   });
 
   async function toggle() {

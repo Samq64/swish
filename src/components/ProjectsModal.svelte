@@ -1,6 +1,6 @@
 <script>
   import { store } from '../data/store.js';
-  import { filterByName } from '../lib/search.js';
+  import { filterByName, hasExactName } from '../lib/search.js';
   import Icon from '../lib/Icon.svelte';
 
   /** Modal for managing projects: rename, recolor, add and delete. */
@@ -20,10 +20,14 @@
 
   let query = $state('');
   let filtered = $derived(filterByName(store.projects, query));
+  let exact = $derived(hasExactName(store.projects, query));
 
-  function addProject() {
+  function createFromSearch() {
+    const name = query.trim();
+    if (!name || exact) return;
     const color = PALETTE[store.projects.length % PALETTE.length];
-    store.addProject({ name: 'New project', color });
+    store.addProject({ name, color });
+    query = '';
   }
 
   function onKeydown(event) {
@@ -51,7 +55,7 @@
     <input
       class="search"
       type="text"
-      placeholder="Search projects…"
+      placeholder="Search or create a project…"
       bind:value={query}
     />
 
@@ -98,17 +102,20 @@
         </div>
       {/each}
 
-      {#if filtered.length === 0}
+      {#if query.trim() && !exact}
+        <button class="create-option" onclick={createFromSearch}>
+          <Icon name="plus" size={14} /> Create "{query.trim()}"
+        </button>
+      {:else if filtered.length === 0}
         <p class="empty">
-          {store.projects.length === 0 ? 'No projects yet.' : 'No matches.'}
+          {store.projects.length === 0
+            ? 'Type a name above to create your first project.'
+            : 'No matches.'}
         </p>
       {/if}
     </div>
 
     <footer class="foot">
-      <button class="add" onclick={addProject}>
-        <Icon name="plus" size={15} /> Add project
-      </button>
       <button class="done" onclick={() => onClose?.()}>Done</button>
     </footer>
   </div>
@@ -170,7 +177,10 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--grid-line);
+    border-top: 1px solid var(--grid-line);
+  }
+  .row:first-child {
+    border-top: none;
   }
   .swatch {
     width: 28px;
@@ -214,6 +224,23 @@
     flex: none;
     padding: var(--space-1);
   }
+  .create-option {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .create-option:hover {
+    background: var(--bg);
+  }
   .empty {
     color: var(--muted);
     font-size: 13px;
@@ -224,20 +251,9 @@
   .foot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: var(--space-3) var(--space-5);
     border-top: 1px solid var(--border);
-  }
-  .add {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    border: 1px dashed var(--border);
-    background: none;
-    color: var(--accent);
-    border-radius: var(--radius);
-    padding: var(--space-2) var(--space-4);
-    font-weight: 600;
   }
   .done {
     border: none;

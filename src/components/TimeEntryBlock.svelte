@@ -26,6 +26,15 @@
 
   let compact = $derived(height < 34);
 
+  // Elapsed time shown inside the running block (H:MM, updates with clock).
+  let elapsedLabel = $derived.by(() => {
+    if (!running) return '';
+    const m = block.endMin - block.startMin;
+    const h = Math.floor(m / 60);
+    const min = Math.floor(m % 60);
+    return `${h}:${String(min).padStart(2, '0')}`;
+  });
+
   function grab(mode, event) {
     if (event.button != null && event.button !== 0) return; // primary only
     onGrab?.(mode, event);
@@ -64,9 +73,13 @@
   <div class="body" class:compact>
     <span class="desc">{label || 'No description'}</span>
     {#if !compact}
-      <span class="range">
-        {formatClock(block.startMin)} – {formatClock(block.endMin)}
-      </span>
+      {#if running && elapsedLabel}
+        <span class="elapsed">{elapsedLabel}</span>
+      {:else}
+        <span class="range">
+          {formatClock(block.startMin)} – {formatClock(block.endMin)}
+        </span>
+      {/if}
     {/if}
     {#if !compact && tags.length}
       <span class="tags">
@@ -118,12 +131,9 @@
     z-index: 5;
   }
   .entry.running {
-    /* A live entry: no minimum height, floats over others, and lets clicks
-       through so you can still create entries behind it. */
     min-height: 0;
     z-index: 7;
-    pointer-events: none;
-    cursor: default;
+    cursor: pointer;
     border-style: dashed;
     border-width: 0 0 0 3px;
     box-shadow: 0 0 0 1px var(--entry-color) inset;
@@ -162,6 +172,12 @@
   .range {
     font-size: 11px;
     opacity: 0.75;
+  }
+  .elapsed {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
   }
   .tags {
     display: flex;

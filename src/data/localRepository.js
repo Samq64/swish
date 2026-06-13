@@ -13,7 +13,7 @@ const WORKSPACES_KEY = 'swish.workspaces.v1';
 const ACTIVE_KEY = 'swish.activeWorkspace.v1';
 const ONBOARDED_KEY = 'swish.onboarded.v1';
 
-const DEFAULT_WORKSPACE = { id: 'w_default', name: 'Workspace' };
+const DEFAULT_WORKSPACE = { id: 'w_default', name: 'Personal' };
 
 function read(key, fallback) {
   try {

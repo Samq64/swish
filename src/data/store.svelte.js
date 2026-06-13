@@ -66,13 +66,17 @@ export class AppStore {
   /** The currently running entry (open-ended), if any. */
   runningEntry = $derived(this.entries.find((e) => e.end === null) ?? null);
 
+  static #sortByName(arr) {
+    return [...arr].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   async init() {
     const [workspaces, active, onboarded] = await Promise.all([
       this.#repo.listWorkspaces(),
       this.#repo.getActiveWorkspaceId(),
       this.#repo.getOnboarded(),
     ]);
-    this.workspaces = workspaces;
+    this.workspaces = AppStore.#sortByName(workspaces);
     this.onboarded = onboarded;
     this.currentWorkspaceId =
       workspaces.find((w) => w.id === active)?.id ??
@@ -88,10 +92,12 @@ export class AppStore {
 
   /** Load every dataset (projects, tags, entries) for the current workspace. */
   async loadWorkspaceData() {
-    [this.projects, this.tags] = await Promise.all([
+    const [projects, tags] = await Promise.all([
       this.#repo.listProjects(this.currentWorkspaceId),
       this.#repo.listTags(this.currentWorkspaceId),
     ]);
+    this.projects = AppStore.#sortByName(projects);
+    this.tags = AppStore.#sortByName(tags);
     await this.loadRange();
   }
 
@@ -117,15 +123,17 @@ export class AppStore {
 
   async addWorkspace(name) {
     const ws = await this.#repo.createWorkspace({ name });
-    this.workspaces = [...this.workspaces, ws];
+    this.workspaces = AppStore.#sortByName([...this.workspaces, ws]);
     await this.switchWorkspace(ws.id);
     return ws;
   }
 
-  renameWorkspace(id, name) {
-    return this.#patch('workspaces', id, { name }, (i, p) =>
+  async renameWorkspace(id, name) {
+    const saved = await this.#patch('workspaces', id, { name }, (i, p) =>
       this.#repo.updateWorkspace(i, p),
     );
+    this.workspaces = AppStore.#sortByName(this.workspaces);
+    return saved;
   }
 
   /** Delete a workspace and its data; refuses to remove the last one. */
@@ -228,14 +236,16 @@ export class AppStore {
       ...data,
       workspaceId: this.currentWorkspaceId,
     });
-    this.projects = [...this.projects, project];
+    this.projects = AppStore.#sortByName([...this.projects, project]);
     return project;
   }
 
-  updateProject(id, patch) {
-    return this.#patch('projects', id, patch, (i, p) =>
+  async updateProject(id, patch) {
+    const saved = await this.#patch('projects', id, patch, (i, p) =>
       this.#repo.updateProject(i, p),
     );
+    if ('name' in patch) this.projects = AppStore.#sortByName(this.projects);
+    return saved;
   }
 
   async removeProject(id) {
@@ -254,12 +264,16 @@ export class AppStore {
       ...data,
       workspaceId: this.currentWorkspaceId,
     });
-    this.tags = [...this.tags, tag];
+    this.tags = AppStore.#sortByName([...this.tags, tag]);
     return tag;
   }
 
-  updateTag(id, patch) {
-    return this.#patch('tags', id, patch, (i, p) => this.#repo.updateTag(i, p));
+  async updateTag(id, patch) {
+    const saved = await this.#patch('tags', id, patch, (i, p) =>
+      this.#repo.updateTag(i, p),
+    );
+    if ('name' in patch) this.tags = AppStore.#sortByName(this.tags);
+    return saved;
   }
 
   async removeTag(id) {

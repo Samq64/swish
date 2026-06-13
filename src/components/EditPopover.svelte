@@ -13,11 +13,39 @@
     projects = [],
     tags = [],
     pos = { x: 0, y: 0 },
+    running = false,
     onChange,
     onCreateTag,
+    onStop,
     onDelete,
     onClose,
   } = $props();
+
+  let dragDelta = $state({ x: 0, y: 0 });
+  let grabState = null;
+
+  let finalX = $derived((pos?.x ?? 0) + dragDelta.x);
+  let finalY = $derived((pos?.y ?? 0) + dragDelta.y);
+
+  // Reset drag offset whenever the anchor changes (new entry selected).
+  $effect(() => {
+    pos.x + pos.y;
+    dragDelta = { x: 0, y: 0 };
+  });
+
+  function startDrag(e) {
+    if (e.button !== 0) return;
+    grabState = { startX: e.clientX, startY: e.clientY, dx: dragDelta.x, dy: dragDelta.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function moveDrag(e) {
+    if (!grabState) return;
+    dragDelta = {
+      x: grabState.dx + e.clientX - grabState.startX,
+      y: grabState.dy + e.clientY - grabState.startY,
+    };
+  }
+  function endDrag() { grabState = null; }
 
   let assigned = $derived(new Set(entry.tagIds ?? []));
 
@@ -56,11 +84,19 @@
 
 <div
   class="popover"
-  style:left="{pos.x}px"
-  style:top="{pos.y}px"
+  style:left="{finalX}px"
+  style:top="{finalY}px"
   role="dialog"
   aria-label="Edit time entry"
 >
+  <div
+    class="drag-handle"
+    onpointerdown={startDrag}
+    onpointermove={moveDrag}
+    onpointerup={endDrag}
+    onpointercancel={endDrag}
+    aria-hidden="true"
+  ></div>
   <input
     class="desc"
     type="text"
@@ -111,14 +147,39 @@
   </div>
 
   <div class="actions">
-    <button class="delete" type="button" onclick={() => onDelete?.()}>
-      Delete
-    </button>
+    {#if running}
+      <button class="stop-btn" type="button" onclick={() => onStop?.()}>
+        Stop
+      </button>
+    {:else}
+      <button class="delete" type="button" onclick={() => onDelete?.()}>
+        Delete
+      </button>
+    {/if}
     <button class="done" type="button" onclick={() => onClose?.()}>Done</button>
   </div>
 </div>
 
 <style>
+  .drag-handle {
+    height: 6px;
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    cursor: grab;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--border) 0,
+      var(--border) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+    opacity: 0.6;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
+    opacity: 1;
+  }
+
   .popover {
     position: fixed;
     z-index: 50;
@@ -182,6 +243,14 @@
     display: flex;
     justify-content: space-between;
     margin-top: var(--space-1);
+  }
+  .stop-btn {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 13px;
+    font-weight: 600;
+    padding: var(--space-1);
   }
   .delete {
     background: none;

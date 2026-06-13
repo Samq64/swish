@@ -4,6 +4,8 @@
   import DayColumn from './DayColumn.svelte';
   import EditPopover from './EditPopover.svelte';
 
+  let scrollEl = $state(null);
+
   /**
    * Renders the visible range as a row of {@link DayColumn}s sharing one hour
    * gutter and one entry editor. Works for both day (1 column) and week
@@ -37,6 +39,15 @@
     return startOfDay(iso).getTime() === startOfDay(new Date()).getTime();
   }
 
+  // Scroll to show current time when the view first mounts.
+  $effect(() => {
+    if (!scrollEl) return;
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const nowPx = minutesToPx(minutes);
+    scrollEl.scrollTop = Math.max(0, nowPx - scrollEl.clientHeight / 3);
+  });
+
   function handleSelect(id, event) {
     selectedId = id;
     if (!id) return;
@@ -48,7 +59,7 @@
 </script>
 
 <div class="view">
-  <div class="scroll">
+  <div class="scroll" bind:this={scrollEl}>
     <!-- Day headers live INSIDE the scroller so they share the body's exact
          column widths (scrollbar included) and stay aligned; `sticky` keeps
          them pinned to the top while the timeline scrolls. Redundant in day
@@ -91,8 +102,10 @@
     projects={store.projects}
     tags={store.tags}
     pos={editorPos}
+    running={selectedEntry.end === null}
     onCreateTag={(name) => store.addTag({ name })}
     onChange={(patch) => store.update(selectedEntry.id, patch)}
+    onStop={() => store.stop(selectedEntry.id)}
     onDelete={() => {
       store.remove(selectedEntry.id);
       selectedId = null;

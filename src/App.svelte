@@ -1,4 +1,5 @@
 <script>
+  import { fade } from 'svelte/transition';
   import { store } from './data/store.js';
   import { formatDuration } from './lib/time.js';
   import { entryDurationMin } from './lib/entries.js';
@@ -16,21 +17,24 @@
   let showProjects = $state(false);
   let showTags = $state(false);
 
-  // Range label: a single day, or "Jun 9 – 15" for a week.
+  // Range label: a single day, or "Jun 7 – 13" for a week (month always first).
   let rangeLabel = $derived.by(() => {
     const days = store.visibleDays;
-    const fmt = (iso, opts) => new Date(iso).toLocaleDateString(undefined, opts);
     if (store.view === 'day') {
-      return fmt(days[0], { weekday: 'long', month: 'short', day: 'numeric' });
+      return new Date(days[0]).toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+      });
     }
     const first = days[0];
     const last = days[days.length - 1];
-    const sameMonth =
-      new Date(first).getMonth() === new Date(last).getMonth();
-    return `${fmt(first, { month: 'short', day: 'numeric' })} – ${fmt(
-      last,
-      sameMonth ? { day: 'numeric' } : { month: 'short', day: 'numeric' },
-    )}`;
+    const sameMonth = new Date(first).getMonth() === new Date(last).getMonth();
+    const mo = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short' });
+    const d = (iso) => new Date(iso).getDate();
+    return sameMonth
+      ? `${mo(first)} ${d(first)} – ${d(last)}`
+      : `${mo(first)} ${d(first)} – ${mo(last)} ${d(last)}`;
   });
 
   // Anchor formatted as YYYY-MM-DD for the date picker's value.
@@ -105,11 +109,15 @@
 </nav>
 
 <main class="timeline-wrap">
-  {#if store.view === 'list'}
-    <ListView />
-  {:else}
-    <TimelineView />
-  {/if}
+  {#key store.view}
+    <div class="view-fade" in:fade={{ duration: 140 }}>
+      {#if store.view === 'list'}
+        <ListView />
+      {:else}
+        <TimelineView />
+      {/if}
+    </div>
+  {/key}
 </main>
 
 {#if showProjects}
@@ -246,9 +254,15 @@
     overflow: hidden;
   }
 
-  /* Day-nav: drop the view toggle to its own full-width row before the
-     single-row layout gets cramped enough to elide the date range. The left
-     group also wraps so the date nav + range + total never overflow. */
+  .view-fade {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* On narrow windows, move the view toggle above the date controls so it's
+     always visible at the top of the nav row. */
   @media (max-width: 768px) {
     .day-nav {
       flex-wrap: wrap;
@@ -259,7 +273,9 @@
       flex-basis: 100%;
     }
     .view-toggle {
+      order: -1;
       flex: 1;
+      flex-basis: 100%;
     }
     .view-toggle button {
       flex: 1;

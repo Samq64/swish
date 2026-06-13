@@ -243,7 +243,13 @@
           start: minutesToISO(dayISO, d.startMin),
           end: minutesToISO(dayISO, d.endMin),
         });
-        onSelect?.(entry.id, event);
+        // On touch, wait one frame so the gesture is fully settled before the
+        // popup appears (avoids the popup fighting the finger-up animation).
+        if (event.pointerType === 'touch') {
+          requestAnimationFrame(() => onSelect?.(entry.id, event));
+        } else {
+          onSelect?.(entry.id, event);
+        }
       } else {
         // A plain click on empty space clears the selection.
         onSelect?.(null, event);
@@ -331,7 +337,9 @@
         block={runningBlock}
         label={store.runningEntry?.description || 'Running…'}
         color={entryColor(store.runningEntry, store.projectsById)}
+        selected={selectedId === runningBlock.id}
         running
+        onGrab={(_, event) => onSelect?.(runningBlock.id, event)}
       />
     {/if}
   </div>
