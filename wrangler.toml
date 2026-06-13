@@ -12,4 +12,4 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "swish"
-database_id = "REPLACE_WITH_REMOTE_DB_ID"
+database_id = "608822e2-3016-486b-9ec4-ab00829a939d"
