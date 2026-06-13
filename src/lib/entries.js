@@ -9,8 +9,8 @@ export function entryProject(entry, projectsById) {
   return entry?.projectId ? (projectsById.get(entry.projectId) ?? null) : null;
 }
 
-/** An entry's project colour, falling back to the accent colour. */
-export function entryColor(entry, projectsById, fallback = 'var(--accent)') {
+/** An entry's project colour, falling back to the neutral "no project" gray. */
+export function entryColor(entry, projectsById, fallback = 'var(--no-project)') {
   return entryProject(entry, projectsById)?.color ?? fallback;
 }
 

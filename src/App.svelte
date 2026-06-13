@@ -55,23 +55,33 @@
 <header class="topbar">
   <WorkspaceSelector />
   <TimerBar />
+  <div class="topbar-actions">
+    <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
+    <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
+  </div>
 </header>
 
 <nav class="day-nav">
-  <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
-    ‹
-  </button>
-  <input
-    class="date-input"
-    type="date"
-    aria-label="Go to date"
-    value={anchorInput}
-    onchange={(e) => pickDate(e.currentTarget.value)}
-  />
-  <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
-    ›
-  </button>
-  <h2 class="range-label">{rangeLabel}</h2>
+  <div class="nav-left">
+    <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
+      ‹
+    </button>
+    <input
+      class="date-input"
+      type="date"
+      aria-label="Go to date"
+      value={anchorInput}
+      onchange={(e) => pickDate(e.currentTarget.value)}
+    />
+    <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
+      ›
+    </button>
+
+    {#if store.view !== 'day'}
+      <h2 class="range-label">{rangeLabel}</h2>
+    {/if}
+    <span class="total">{formatDuration(totalMin)} tracked</span>
+  </div>
 
   <div class="view-toggle" role="group" aria-label="View">
     <button class:active={store.view === 'day'} onclick={() => store.setView('day')}>
@@ -90,12 +100,6 @@
       List
     </button>
   </div>
-
-  <button class="nav-btn projects" onclick={() => (showProjects = true)}>
-    Projects
-  </button>
-  <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
-  <span class="total">{formatDuration(totalMin)} tracked</span>
 </nav>
 
 <main class="timeline-wrap">
@@ -129,24 +133,39 @@
   .topbar {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 12px 20px;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+  .topbar-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+  /* Match the taller timer bar so the header controls line up. */
+  .topbar-actions .nav-btn {
+    padding: var(--space-2) var(--space-3);
   }
   .day-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+  }
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
   }
   .nav-btn {
     border: 1px solid var(--border);
     background: var(--surface);
-    border-radius: 8px;
-    padding: 5px 12px;
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
     color: var(--text);
     line-height: 1;
   }
@@ -156,28 +175,29 @@
   .date-input {
     border: 1px solid var(--border);
     background: var(--surface);
-    border-radius: 8px;
-    padding: 4px 10px;
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
     color: var(--text);
     font-size: 14px;
   }
   .range-label {
-    margin: 0 0 0 8px;
+    margin: 0 0 0 var(--space-1);
     font-size: 16px;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .view-toggle {
-    margin-left: 16px;
+    flex: none;
     display: inline-flex;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   .view-toggle button {
     border: none;
     background: var(--surface);
-    padding: 5px 14px;
+    padding: var(--space-1) var(--space-3);
     color: var(--muted);
     font-weight: 600;
   }
@@ -186,12 +206,15 @@
     color: white;
   }
 
-  .projects {
-    margin-left: auto;
-  }
   .total {
     color: var(--muted);
     font-size: 13px;
+    white-space: nowrap;
+  }
+  /* Separator dot only when the range label precedes the total (week/list). */
+  .range-label + .total::before {
+    content: '·';
+    margin-right: var(--space-2);
   }
 
   .timeline-wrap {

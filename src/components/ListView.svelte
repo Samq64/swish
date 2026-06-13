@@ -142,7 +142,7 @@
           <button class="row" class:selected={selectedId === e.id} onclick={(ev) => select(e.id, ev)}>
             <span
               class="dot"
-              style:background={project?.color ?? 'var(--border)'}
+              style:background={project?.color ?? 'var(--no-project)'}
             ></span>
             <span class="desc">{e.description || 'No description'}</span>
 
@@ -207,15 +207,15 @@
   .filter-bar {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 10px 20px;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
     border-bottom: 1px solid var(--border);
   }
   .filter-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
   }
   .filter-label {
     font-size: 13px;
@@ -226,12 +226,12 @@
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--muted);
     border-radius: 999px;
-    padding: 2px 10px;
+    padding: 2px var(--space-2);
     font-size: 12px;
   }
   .chip .dot {
@@ -251,22 +251,22 @@
     background: none;
     color: var(--accent);
     font-size: 12px;
-    margin-left: 4px;
+    margin-left: var(--space-1);
   }
 
   .scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 0 40px;
+    padding: var(--space-2) 0 var(--space-5);
   }
   .day-group {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
   .day-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    padding: 10px 20px 4px;
+    padding: var(--space-3) var(--space-5) var(--space-1);
     position: sticky;
     top: 0;
     background: var(--surface);
@@ -284,13 +284,13 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
     text-align: left;
     background: none;
     border: none;
     border-bottom: 1px solid var(--grid-line);
-    padding: 10px 20px;
+    padding: var(--space-3) var(--space-5);
     font: inherit;
     color: inherit;
   }
@@ -317,12 +317,12 @@
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
     flex: 1;
   }
   .tag {
     font-size: 11px;
-    padding: 1px 8px;
+    padding: 1px var(--space-2);
     border-radius: 999px;
     background: var(--bg);
     color: var(--muted);
@@ -352,6 +352,6 @@
     text-align: center;
     color: var(--muted);
     font-size: 14px;
-    padding: 40px 0;
+    padding: var(--space-5) 0;
   }
 </style>

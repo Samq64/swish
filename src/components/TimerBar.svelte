@@ -62,11 +62,11 @@
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 6px 6px 6px 14px;
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
   }
   .desc {
     flex: 1;
@@ -86,8 +86,8 @@
   }
   .toggle {
     border: none;
-    border-radius: 8px;
-    padding: 8px 20px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-5);
     font-weight: 600;
     color: white;
     background: var(--accent);

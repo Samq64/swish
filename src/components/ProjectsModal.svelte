@@ -128,14 +128,14 @@
     display: flex;
     flex-direction: column;
     background: var(--surface);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   }
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: var(--space-3) var(--space-5);
     border-bottom: 1px solid var(--border);
   }
   .head h2 {
@@ -148,25 +148,25 @@
     font-size: 24px;
     line-height: 1;
     color: var(--muted);
-    padding: 0 4px;
+    padding: 0 var(--space-1);
   }
 
   .search {
-    margin: 0 20px 4px;
+    margin: var(--space-2) var(--space-5) var(--space-1);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     font-size: 14px;
   }
   .list {
-    padding: 8px 20px;
+    padding: var(--space-2) var(--space-5);
     overflow-y: auto;
   }
   .row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
     border-bottom: 1px solid var(--grid-line);
   }
   .swatch {
@@ -175,13 +175,13 @@
     flex: none;
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: none;
     cursor: pointer;
   }
   .palette {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     flex: none;
   }
   .dot {
@@ -198,8 +198,8 @@
     flex: 1;
     min-width: 0;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 8px;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     font-size: 14px;
   }
   .delete {
@@ -213,30 +213,30 @@
     color: var(--muted);
     font-size: 13px;
     text-align: center;
-    padding: 16px 0;
+    padding: var(--space-4) 0;
   }
 
   .foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
+    padding: var(--space-3) var(--space-5);
     border-top: 1px solid var(--border);
   }
   .add {
     border: 1px dashed var(--border);
     background: none;
     color: var(--accent);
-    border-radius: 8px;
-    padding: 8px 14px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
     font-weight: 600;
   }
   .done {
     border: none;
     background: var(--accent);
     color: white;
-    border-radius: 8px;
-    padding: 8px 18px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
     font-weight: 600;
   }
 </style>

@@ -94,14 +94,14 @@
     display: flex;
     flex-direction: column;
     background: var(--surface);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   }
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 8px;
+    padding: var(--space-3) var(--space-5) var(--space-2);
   }
   .head h2 {
     margin: 0;
@@ -113,32 +113,32 @@
     font-size: 24px;
     line-height: 1;
     color: var(--muted);
-    padding: 0 4px;
+    padding: 0 var(--space-1);
   }
   .hint {
     margin: 0;
-    padding: 0 20px 8px;
+    padding: 0 var(--space-5) var(--space-2);
     font-size: 12px;
     color: var(--muted);
     border-bottom: 1px solid var(--border);
   }
 
   .search {
-    margin: 8px 20px 4px;
+    margin: var(--space-2) var(--space-5) var(--space-1);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     font-size: 14px;
   }
   .list {
-    padding: 8px 20px;
+    padding: var(--space-2) var(--space-5);
     overflow-y: auto;
   }
   .row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
     border-bottom: 1px solid var(--grid-line);
   }
   .hash {
@@ -149,8 +149,8 @@
     flex: 1;
     min-width: 0;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 8px;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     font-size: 14px;
   }
   .delete {
@@ -164,30 +164,30 @@
     color: var(--muted);
     font-size: 13px;
     text-align: center;
-    padding: 16px 0;
+    padding: var(--space-4) 0;
   }
 
   .foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
+    padding: var(--space-3) var(--space-5);
     border-top: 1px solid var(--border);
   }
   .add {
     border: 1px dashed var(--border);
     background: none;
     color: var(--accent);
-    border-radius: 8px;
-    padding: 8px 14px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
     font-weight: 600;
   }
   .done {
     border: none;
     background: var(--accent);
     color: white;
-    border-radius: 8px;
-    padding: 8px 18px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
     font-weight: 600;
   }
 </style>

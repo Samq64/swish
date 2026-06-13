@@ -98,25 +98,25 @@
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: var(--surface);
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     min-height: 30px;
     cursor: pointer;
   }
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
     flex: 1;
   }
   .chip {
     background: color-mix(in srgb, var(--accent) 15%, white);
     color: var(--accent);
     border-radius: 999px;
-    padding: 1px 9px;
+    padding: 1px var(--space-2);
     font-size: 12px;
     font-weight: 600;
   }
@@ -137,23 +137,23 @@
 
   .panel {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + var(--space-1));
     left: 0;
     right: 0;
     z-index: 60;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-    padding: 6px;
+    padding: var(--space-1);
   }
   .search {
     width: 100%;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
     font-size: 13px;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
   }
   .options {
     max-height: 180px;
@@ -162,9 +162,9 @@
   .option {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 6px;
-    border-radius: 6px;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
     font-size: 13px;
     cursor: pointer;
   }
@@ -182,8 +182,8 @@
     color: var(--accent);
     font-size: 13px;
     font-weight: 600;
-    padding: 6px;
-    border-radius: 6px;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
     cursor: pointer;
   }
   .create:hover {
@@ -191,7 +191,7 @@
   }
   .none {
     margin: 0;
-    padding: 8px 6px;
+    padding: var(--space-2);
     font-size: 13px;
     color: var(--muted);
   }

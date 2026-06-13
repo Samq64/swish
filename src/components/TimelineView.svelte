@@ -128,8 +128,8 @@
     display: flex;
     align-items: baseline;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 4px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-1);
     border-left: 1px solid var(--border);
   }
   .day-head .dow {

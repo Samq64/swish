@@ -125,18 +125,18 @@
     width: 240px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
-    padding: 12px;
+    padding: var(--space-3);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-3);
   }
   .desc {
     width: 100%;
     border: none;
     border-bottom: 2px solid var(--border);
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     font-size: 14px;
     font-weight: 600;
     outline: none;
@@ -153,14 +153,14 @@
   }
   .row select {
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
     background: var(--surface);
   }
   .tags-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
   }
   .tags-field .label {
     font-size: 13px;
@@ -169,32 +169,32 @@
   .times {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: 13px;
   }
   .times input {
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
   }
   .actions {
     display: flex;
     justify-content: space-between;
-    margin-top: 2px;
+    margin-top: var(--space-1);
   }
   .delete {
     background: none;
     border: none;
     color: #d63031;
     font-size: 13px;
-    padding: 4px;
+    padding: var(--space-1);
   }
   .done {
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 6px 14px;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
     font-size: 13px;
   }
 </style>

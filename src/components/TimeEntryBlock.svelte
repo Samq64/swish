@@ -95,7 +95,7 @@
     position: absolute;
     /* Keep short entries tall enough to read one line of text. */
     min-height: 20px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--entry-color) 16%, white);
     border-left: 3px solid var(--entry-color);
     overflow: hidden;
@@ -140,7 +140,7 @@
   }
 
   .body {
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -150,7 +150,7 @@
   }
   .body.compact {
     justify-content: center;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
   }
   .desc {
     font-size: 12px;

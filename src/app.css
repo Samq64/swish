@@ -5,8 +5,21 @@
   --text: #2d2d3a;
   --muted: #8a8a9a;
   --accent: #6c5ce7;
+  --no-project: #9ca3af;
   --grid-line: #ededf3;
   --grid-line-strong: #e0e0ea;
+
+  /* Spacing scale (4px base) — use these instead of ad-hoc pixel values. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+
+  /* Radius scale: sm = inner controls, md = buttons/inputs, lg = cards. */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
   font-family:
     system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
