@@ -37,15 +37,14 @@ export async function createSession(env, userId) {
   const token = newSessionToken();
   const id = await sha256b64url(token);
   const now = Date.now();
-  await env.DB.prepare(
-    'INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)',
-  )
-    .bind(
-      id,
-      userId,
-      new Date(now).toISOString(),
-      new Date(now + SESSION_TTL_MS).toISOString(),
-    )
-    .run();
+  const nowIso = new Date(now).toISOString();
+  await env.DB.batch([
+    env.DB
+      .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)')
+      .bind(id, userId, nowIso, new Date(now + SESSION_TTL_MS).toISOString()),
+    // Opportunistically reap expired sessions (indexed by expires_at). Pages has
+    // no cron trigger; a dedicated scheduled Worker would be the alternative.
+    env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(nowIso),
+  ]);
   return token;
 }

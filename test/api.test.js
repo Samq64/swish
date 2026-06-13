@@ -206,6 +206,38 @@ test('deleting a tag detaches it from entries', async () => {
   assert.deepEqual(list.json[0].tagIds, []);
 });
 
+test('an entry cannot reference a project or tag from another workspace', async () => {
+  const other = await api('POST', '/api/workspaces', { cookie: alice, body: { name: 'Other' } });
+  const foreignTag = await api('POST', '/api/tags', {
+    cookie: alice,
+    body: { workspaceId: other.json.id, name: 'foreign' },
+  });
+  const foreignProject = await api('POST', '/api/projects', {
+    cookie: alice,
+    body: { workspaceId: other.json.id, name: 'foreign' },
+  });
+
+  const badTag = await api('POST', '/api/entries', {
+    cookie: alice,
+    body: { workspaceId: workspace, start: TODAY, end: TOMORROW, tagIds: [foreignTag.json.id] },
+  });
+  assert.equal(badTag.status, 400);
+
+  const badProject = await api('POST', '/api/entries', {
+    cookie: alice,
+    body: { workspaceId: workspace, start: TODAY, projectId: foreignProject.json.id },
+  });
+  assert.equal(badProject.status, 400);
+});
+
+test('a malformed timestamp is rejected', async () => {
+  const r = await api('POST', '/api/entries', {
+    cookie: alice,
+    body: { workspaceId: workspace, start: 'not-a-date' },
+  });
+  assert.equal(r.status, 400);
+});
+
 test('a second user cannot read or write the first user’s data', async () => {
   const bob = await registerUser('bob', 'hunter2pw');
   const own = await api('GET', '/api/workspaces', { cookie: bob });
@@ -235,7 +267,11 @@ test('login rejects a wrong password and accepts the right one', async () => {
 
 test('logout clears the session and redirects to /login', async () => {
   const throwaway = (await form('/login', { username: 'alice', password: 'hunter2pw' })).cookie;
-  const res = await fetch(`${BASE}/logout`, { headers: { cookie: throwaway }, redirect: 'manual' });
+  const res = await fetch(`${BASE}/logout`, {
+    method: 'POST',
+    headers: { cookie: throwaway, origin: ORIGIN },
+    redirect: 'manual',
+  });
   assert.equal(res.status, 302);
   assert.match(res.headers.get('location'), /\/login$/);
   assert.equal((await api('GET', '/api/auth/me', { cookie: throwaway })).status, 401);

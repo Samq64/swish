@@ -68,7 +68,7 @@
  * @typedef {Object} WorkspaceExport
  * @property {'swish.workspace'} type
  * @property {number} version
- * @property {{name: string}} workspace
+ * @property {string} name
  * @property {Project[]} projects
  * @property {Tag[]} tags
  * @property {TimeEntry[]} entries

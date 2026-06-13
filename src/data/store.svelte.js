@@ -99,7 +99,13 @@ export class AppStore {
 
   /** Sign out of this device (server clears the session and redirects). */
   logout() {
-    window.location.assign('/logout');
+    // POST via a form submit so the navigation carries our Origin — /logout is
+    // POST-only to keep sign-out off cross-site GETs.
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/logout';
+    document.body.append(form);
+    form.submit();
   }
 
   /** Sign out every other session, keeping this one active. */

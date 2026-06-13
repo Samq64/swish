@@ -1,10 +1,13 @@
 // swish API — a single catch-all Pages Function serving /api/*.
 //
-// Pipeline: CSRF/origin check → session resolution → per-resource handler.
-// Every data query is scoped to the authenticated user: `workspaceId` from the
-// client is treated as a claim to authorize, never as a trusted scope.
+// Pipeline: top-level error boundary → CSRF/origin check → session resolution →
+// per-resource handler. Every data query is scoped to the authenticated user:
+// `workspaceId` from the client is treated as a claim to authorize, never as a
+// trusted scope, and ids referenced in a body (projectId/tagIds) are verified
+// to live in the same workspace.
 
 import { json, error, readJson, sameOrigin } from '../_lib/http.js';
+import { isIso, isStr, isStrArray, isHexColor } from '../_lib/validate.js';
 import {
   hashPassword,
   verifyPassword,
@@ -15,8 +18,22 @@ import {
 import { resolveUser } from '../_lib/session.js';
 
 const DEFAULT_COLOR = '#6c5ce7';
+const NAME_MAX = 200;
+const DESC_MAX = 2000;
+// Cap on statements per D1 batch when importing (keeps a large import under the
+// runtime's bound-statement limit). See importWorkspace.
+const IMPORT_BATCH_SIZE = 50;
 
 export async function onRequest(context) {
+  try {
+    return await route(context);
+  } catch {
+    // Never leak a stack to the client; surface a generic 500.
+    return error(500, 'Internal error');
+  }
+}
+
+async function route(context) {
   const { request, env, params } = context;
   const method = request.method;
   const segs = params.path || [];
@@ -47,7 +64,7 @@ export async function onRequest(context) {
   }
 }
 
-// --- authorization helpers ---------------------------------------------------
+// --- authorization & reference helpers ---------------------------------------
 
 async function ownsWorkspace(env, userId, workspaceId) {
   if (!workspaceId) return false;
@@ -59,15 +76,58 @@ async function ownsWorkspace(env, userId, workspaceId) {
   return !!row;
 }
 
-/** The user_id that owns a workspace-scoped row, or null. `table` is internal. */
-async function rowOwner(env, table, id) {
+// The only tables addressed by id through handleScoped/ownership helpers. Used
+// as an allowlist so the `${table}` interpolation below can never be anything
+// but one of these literals.
+const SCOPED_TABLES = new Set(['projects', 'tags']);
+
+/** Whether `userId` owns the workspace-scoped row `id` in `table`. */
+async function ownsScopedRow(env, table, id, userId) {
+  if (!SCOPED_TABLES.has(table)) throw new Error(`unsupported table: ${table}`);
   const row = await env.DB.prepare(
-    `SELECT w.user_id AS uid FROM ${table} t
-       JOIN workspaces w ON w.id = t.workspace_id WHERE t.id = ?`,
+    `SELECT 1 AS ok FROM ${table} t
+       JOIN workspaces w ON w.id = t.workspace_id
+      WHERE t.id = ? AND w.user_id = ?`,
   )
-    .bind(id)
+    .bind(id, userId)
     .first();
-  return row ? row.uid : null;
+  return !!row;
+}
+
+/** The workspace owning entry `id` for `userId`, or null if not theirs. */
+async function ownedEntryWorkspace(env, userId, id) {
+  const row = await env.DB.prepare(
+    `SELECT e.workspace_id AS wid FROM entries e
+       JOIN workspaces w ON w.id = e.workspace_id
+      WHERE e.id = ? AND w.user_id = ?`,
+  )
+    .bind(id, userId)
+    .first();
+  return row?.wid ?? null;
+}
+
+/** True when projectId is null/absent or a project in `workspaceId`. */
+async function projectInWorkspace(env, workspaceId, projectId) {
+  if (projectId == null) return true;
+  const row = await env.DB.prepare(
+    'SELECT 1 AS ok FROM projects WHERE id = ? AND workspace_id = ?',
+  )
+    .bind(projectId, workspaceId)
+    .first();
+  return !!row;
+}
+
+/** True when every id in tagIds is a tag within `workspaceId`. */
+async function tagsInWorkspace(env, workspaceId, tagIds) {
+  const unique = [...new Set(tagIds ?? [])];
+  if (unique.length === 0) return true;
+  const placeholders = unique.map(() => '?').join(',');
+  const { results } = await env.DB.prepare(
+    `SELECT id FROM tags WHERE workspace_id = ? AND id IN (${placeholders})`,
+  )
+    .bind(workspaceId, ...unique)
+    .all();
+  return results.length === unique.length;
 }
 
 // --- entries -----------------------------------------------------------------
@@ -107,6 +167,7 @@ async function handleEntries(ctx, rest, method, user) {
       const from = url.searchParams.get('from');
       const to = url.searchParams.get('to');
       if (!(await ownsWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
+      if (!isIso(from) || !isIso(to)) return error(400, 'from and to must be ISO timestamps');
       // The open running entry is always returned, even outside [from, to), so
       // the timer is consistent on every device and view.
       const { results } = await env.DB.prepare(
@@ -122,6 +183,13 @@ async function handleEntries(ctx, rest, method, user) {
     if (method === 'POST') {
       const body = (await readJson(request)) || {};
       if (!(await ownsWorkspace(env, user.id, body.workspaceId))) return error(403, 'Forbidden');
+      const invalid = validateEntryBody(body, { requireStart: true });
+      if (invalid) return error(400, invalid);
+      if (!(await projectInWorkspace(env, body.workspaceId, body.projectId ?? null)))
+        return error(400, 'Project does not belong to this workspace');
+      if (!(await tagsInWorkspace(env, body.workspaceId, body.tagIds)))
+        return error(400, 'One or more tags do not belong to this workspace');
+
       const id = crypto.randomUUID();
       const stmts = [
         env.DB.prepare(
@@ -144,10 +212,34 @@ async function handleEntries(ctx, rest, method, user) {
   }
 
   const id = rest[0];
-  if ((await rowOwner(env, 'entries', id)) !== user.id) return error(403, 'Forbidden');
+
+  if (method === 'DELETE') {
+    // Authorize and delete in one statement: the WHERE only matches a row the
+    // user owns, so meta.changes distinguishes success from forbidden/missing.
+    const res = await env.DB.prepare(
+      `DELETE FROM entries WHERE id = ?
+         AND workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)`,
+    )
+      .bind(id, user.id)
+      .run();
+    if (!res.meta.changes) return error(404, 'Not found');
+    return new Response(null, { status: 204 });
+  }
 
   if (method === 'PATCH') {
+    // One lookup authorizes the row and yields its workspace, which we then use
+    // to validate any project/tag references in the patch.
+    const workspaceId = await ownedEntryWorkspace(env, user.id, id);
+    if (!workspaceId) return error(404, 'Not found');
+
     const body = (await readJson(request)) || {};
+    const invalid = validateEntryBody(body, { requireStart: false });
+    if (invalid) return error(400, invalid);
+    if ('projectId' in body && !(await projectInWorkspace(env, workspaceId, body.projectId ?? null)))
+      return error(400, 'Project does not belong to this workspace');
+    if ('tagIds' in body && !(await tagsInWorkspace(env, workspaceId, body.tagIds)))
+      return error(400, 'One or more tags do not belong to this workspace');
+
     const sets = [];
     const vals = [];
     if ('description' in body) (sets.push('description = ?'), vals.push(body.description));
@@ -169,11 +261,22 @@ async function handleEntries(ctx, rest, method, user) {
     return json(await getEntry(env, id));
   }
 
-  if (method === 'DELETE') {
-    await env.DB.prepare('DELETE FROM entries WHERE id = ?').bind(id).run();
-    return new Response(null, { status: 204 });
-  }
   return error(405, 'Method not allowed');
+}
+
+/** Returns an error message for a bad entry body, or null when it's valid. */
+function validateEntryBody(body, { requireStart }) {
+  if (requireStart || 'start' in body) {
+    if (!isIso(body.start)) return 'start must be an ISO timestamp';
+  }
+  if ('end' in body && body.end != null && !isIso(body.end))
+    return 'end must be an ISO timestamp or null';
+  if ('description' in body && !isStr(body.description, { max: DESC_MAX }))
+    return 'description must be a string';
+  if ('projectId' in body && body.projectId != null && !isStr(body.projectId))
+    return 'projectId must be a string or null';
+  if ('tagIds' in body && !isStrArray(body.tagIds)) return 'tagIds must be an array of strings';
+  return null;
 }
 
 function tagInserts(env, entryId, tagIds) {
@@ -213,6 +316,8 @@ async function handleScoped(ctx, table, rest, method, user) {
     if (method === 'POST') {
       const body = (await readJson(request)) || {};
       if (!(await ownsWorkspace(env, user.id, body.workspaceId))) return error(403, 'Forbidden');
+      const invalid = validateScopedBody(table, body);
+      if (invalid) return error(400, invalid);
       const row = { id: crypto.randomUUID(), workspace_id: body.workspaceId, name: body.name ?? '' };
       if (table === 'projects') row.color = body.color ?? DEFAULT_COLOR;
       const cols = Object.keys(row);
@@ -227,10 +332,12 @@ async function handleScoped(ctx, table, rest, method, user) {
   }
 
   const id = rest[0];
-  if ((await rowOwner(env, table, id)) !== user.id) return error(403, 'Forbidden');
 
   if (method === 'PATCH') {
     const body = (await readJson(request)) || {};
+    const invalid = validateScopedBody(table, body);
+    if (invalid) return error(400, invalid);
+    if (!(await ownsScopedRow(env, table, id, user.id))) return error(404, 'Not found');
     const sets = [];
     const vals = [];
     for (const f of cfg.fields) {
@@ -246,12 +353,28 @@ async function handleScoped(ctx, table, rest, method, user) {
   }
 
   if (method === 'DELETE') {
-    // Deleting a project SET NULLs entries.project_id; deleting a tag cascades
-    // through entry_tags — both via FK rules in the schema.
-    await env.DB.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(id).run();
+    // Authorize-and-delete in one statement (see entries DELETE). Deleting a
+    // project SET NULLs entries.project_id; deleting a tag cascades through
+    // entry_tags — both via FK rules in the schema.
+    const res = await env.DB.prepare(
+      `DELETE FROM ${table} WHERE id = ?
+         AND workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)`,
+    )
+      .bind(id, user.id)
+      .run();
+    if (!res.meta.changes) return error(404, 'Not found');
     return new Response(null, { status: 204 });
   }
   return error(405, 'Method not allowed');
+}
+
+/** Returns an error message for a bad project/tag body, or null when valid. */
+function validateScopedBody(table, body) {
+  // name is optional (defaults to '' on create); when present it must be a string.
+  if ('name' in body && !isStr(body.name, { max: NAME_MAX })) return 'name must be a string';
+  if (table === 'projects' && 'color' in body && !isHexColor(body.color))
+    return 'color must be a hex colour';
+  return null;
 }
 
 // --- workspaces (+ export/import) --------------------------------------------
@@ -270,6 +393,8 @@ async function handleWorkspaces(ctx, rest, method, user) {
     }
     if (method === 'POST') {
       const body = (await readJson(request)) || {};
+      if (body.name != null && !isStr(body.name, { max: NAME_MAX }))
+        return error(400, 'name must be a string');
       const id = crypto.randomUUID();
       const name = (body.name ?? 'Workspace').toString();
       await env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)')
@@ -282,6 +407,7 @@ async function handleWorkspaces(ctx, rest, method, user) {
 
   if (rest[0] === 'import' && method === 'POST') {
     const payload = (await readJson(request)) || {};
+    if (payload.type !== 'swish.workspace') return error(400, 'Unrecognized import file');
     return json(await importWorkspace(env, user.id, payload));
   }
 
@@ -295,6 +421,8 @@ async function handleWorkspaces(ctx, rest, method, user) {
 
   if (method === 'PATCH') {
     const body = (await readJson(request)) || {};
+    if (body.name != null && !isStr(body.name, { max: NAME_MAX }))
+      return error(400, 'name must be a string');
     const name = (body.name ?? '').toString();
     await env.DB.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(name, id).run();
     return json({ id, name });
@@ -331,12 +459,12 @@ async function exportWorkspace(env, id) {
     start: e.start,
     end: e.end,
   }));
-  return { type: 'swish.workspace', version: 1, workspace: { name: ws.name }, projects, tags, entries };
+  return { type: 'swish.workspace', version: 1, name: ws.name, projects, tags, entries };
 }
 
 async function importWorkspace(env, userId, payload) {
   const wsId = crypto.randomUUID();
-  const name = (payload?.workspace?.name || 'Imported workspace').toString();
+  const name = (payload?.name || 'Imported workspace').toString();
   const stmts = [
     env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(wsId, userId, name),
   ];
@@ -378,7 +506,12 @@ async function importWorkspace(env, userId, payload) {
     }
   }
 
-  await env.DB.batch(stmts);
+  // D1 caps statements per batch, so a large import is committed in chunks. The
+  // workspace insert leads the first chunk; a mid-import failure can therefore
+  // leave a partial workspace, which the user can simply delete and re-import.
+  for (let i = 0; i < stmts.length; i += IMPORT_BATCH_SIZE) {
+    await env.DB.batch(stmts.slice(i, i + IMPORT_BATCH_SIZE));
+  }
   return { id: wsId, name };
 }
 
