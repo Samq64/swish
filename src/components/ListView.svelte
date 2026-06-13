@@ -262,7 +262,7 @@
     flex: none;
   }
   .chip.on {
-    background: color-mix(in srgb, var(--accent) 15%, white);
+    background: color-mix(in srgb, var(--accent) 15%, var(--surface));
     border-color: var(--accent);
     color: var(--accent);
     font-weight: 600;

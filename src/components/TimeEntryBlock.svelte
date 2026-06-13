@@ -96,7 +96,7 @@
     /* Keep short entries tall enough to read one line of text. */
     min-height: 20px;
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--entry-color) 16%, white);
+    background: color-mix(in srgb, var(--entry-color) 16%, var(--surface));
     border-left: 3px solid var(--entry-color);
     overflow: hidden;
     user-select: none;
@@ -146,7 +146,7 @@
     flex-direction: column;
     gap: 2px;
     pointer-events: none;
-    color: color-mix(in srgb, var(--entry-color) 70%, #1a1a22);
+    color: color-mix(in srgb, var(--entry-color) 70%, var(--text));
   }
   .body.compact {
     justify-content: center;
@@ -174,8 +174,8 @@
     line-height: 1.4;
     padding: 0 5px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--entry-color) 22%, white);
-    color: color-mix(in srgb, var(--entry-color) 75%, #1a1a22);
+    background: color-mix(in srgb, var(--entry-color) 22%, var(--surface));
+    color: color-mix(in srgb, var(--entry-color) 75%, var(--text));
     white-space: nowrap;
   }
 
