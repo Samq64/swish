@@ -9,12 +9,10 @@ import {
   hashPassword,
   verifyPassword,
   sha256b64url,
-  newSessionToken,
-  sessionCookie,
   clearSessionCookie,
   readSessionCookie,
-  SESSION_TTL_MS,
 } from '../_lib/auth.js';
+import { resolveUser } from '../_lib/session.js';
 
 const DEFAULT_COLOR = '#6c5ce7';
 
@@ -47,48 +45,6 @@ export async function onRequest(context) {
     default:
       return error(404, 'Not found');
   }
-}
-
-// --- sessions ----------------------------------------------------------------
-
-async function resolveUser(env, request) {
-  const token = readSessionCookie(request);
-  if (!token) return null;
-  const id = await sha256b64url(token);
-  const row = await env.DB.prepare(
-    `SELECT s.user_id, s.expires_at, u.username, u.active_workspace_id
-       FROM sessions s JOIN users u ON u.id = s.user_id
-      WHERE s.id = ?`,
-  )
-    .bind(id)
-    .first();
-  if (!row) return null;
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(id).run();
-    return null;
-  }
-  return {
-    id: row.user_id,
-    username: row.username,
-    activeWorkspaceId: row.active_workspace_id,
-  };
-}
-
-async function createSession(env, userId) {
-  const token = newSessionToken();
-  const id = await sha256b64url(token);
-  const now = Date.now();
-  await env.DB.prepare(
-    'INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)',
-  )
-    .bind(
-      id,
-      userId,
-      new Date(now).toISOString(),
-      new Date(now + SESSION_TTL_MS).toISOString(),
-    )
-    .run();
-  return token;
 }
 
 // --- authorization helpers ---------------------------------------------------
@@ -455,68 +411,9 @@ async function handleAuth(ctx, rest, method) {
     return json({ username: user.username, activeWorkspaceId: user.activeWorkspaceId });
   }
 
-  if (action === 'register' && method === 'POST') {
-    const body = (await readJson(request)) || {};
-    const username = (body.username ?? '').trim();
-    const password = body.password ?? '';
-    if (username.length < 3 || username.length > 32)
-      return error(400, 'Username must be 3–32 characters');
-    if (password.length < 8) return error(400, 'Password must be at least 8 characters');
-
-    const existing = await env.DB.prepare('SELECT 1 AS ok FROM users WHERE username = ?')
-      .bind(username)
-      .first();
-    if (existing) return error(409, 'Username already taken');
-
-    const pw = await hashPassword(password, env.PEPPER);
-    const userId = crypto.randomUUID();
-    const wsId = crypto.randomUUID();
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO users (id, username, pw_hash, pw_salt, pw_iterations, active_workspace_id, created_at)
-         VALUES (?,?,?,?,?,?,?)`,
-      ).bind(userId, username, pw.hash, pw.salt, pw.iterations, wsId, new Date(Date.now()).toISOString()),
-      env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(wsId, userId, 'Personal'),
-    ]);
-    const token = await createSession(env, userId);
-    return json(
-      { username, activeWorkspaceId: wsId },
-      { headers: { 'Set-Cookie': sessionCookie(token) } },
-    );
-  }
-
-  if (action === 'login' && method === 'POST') {
-    const body = (await readJson(request)) || {};
-    const username = (body.username ?? '').trim();
-    const password = body.password ?? '';
-    const row = await env.DB.prepare(
-      'SELECT id, pw_hash, pw_salt, pw_iterations, active_workspace_id FROM users WHERE username = ?',
-    )
-      .bind(username)
-      .first();
-    if (!row) return error(401, 'Invalid username or password');
-    const ok = await verifyPassword(
-      password,
-      { hash: row.pw_hash, salt: row.pw_salt, iterations: row.pw_iterations },
-      env.PEPPER,
-    );
-    if (!ok) return error(401, 'Invalid username or password');
-    const token = await createSession(env, row.id);
-    return json(
-      { username, activeWorkspaceId: row.active_workspace_id },
-      { headers: { 'Set-Cookie': sessionCookie(token) } },
-    );
-  }
-
-  if (action === 'logout' && method === 'POST') {
-    const token = readSessionCookie(request);
-    if (token) {
-      await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(await sha256b64url(token)).run();
-    }
-    return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
-  }
-
-  // The remaining auth actions operate on the signed-in account.
+  // Sign in / sign up / sign out are server-rendered routes (/login, /register,
+  // /logout), not API calls. The remaining actions operate on the signed-in
+  // account.
   const user = await resolveUser(env, request);
   if (!user) return error(401, 'Not authenticated');
 

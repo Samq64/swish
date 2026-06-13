@@ -10,7 +10,6 @@
   import ListView from './components/ListView.svelte';
   import ProjectsModal from './components/ProjectsModal.svelte';
   import TagsModal from './components/TagsModal.svelte';
-  import AuthView from './components/AuthView.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import WorkspacesModal from './components/WorkspacesModal.svelte';
 
@@ -63,9 +62,7 @@
 </script>
 
 {#if !store.ready}
-  <!-- Initial session check; brief, render nothing to avoid a flash. -->
-{:else if !store.currentUser}
-  <AuthView />
+  <!-- Loading the signed-in user's data; the middleware already gated access. -->
 {:else}
 <header class="topbar">
   <WorkspaceSelector

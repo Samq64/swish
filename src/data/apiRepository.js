@@ -22,6 +22,10 @@ async function request(method, path, body) {
     headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  // Session gone/expired: bounce to the login route.
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.location.assign('/login');
+  }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data?.error || `Request failed (${res.status})`);
@@ -43,12 +47,9 @@ const qs = (params) => {
 
 export function createApiRepository() {
   return {
-    // --- auth ---
-    register: (username, password) => post('/auth/register', { username, password }),
-    login: (username, password) => post('/auth/login', { username, password }),
-    logout: () => post('/auth/logout'),
-    logoutOthers: () => post('/auth/logout-others'),
+    // --- auth (sign in/up/out are server routes: /login, /register, /logout) ---
     me: () => get('/auth/me'),
+    logoutOthers: () => post('/auth/logout-others'),
     changePassword: (currentPassword, newPassword) =>
       post('/auth/password', { currentPassword, newPassword }),
     deleteAccount: (password) => request('DELETE', '/auth/account', { password }),

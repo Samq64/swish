@@ -74,45 +74,32 @@ export class AppStore {
 
   // --- auth & bootstrap ------------------------------------------------------
 
-  /** Check for an existing session on startup and load data if signed in. */
+  /**
+   * Load the signed-in user's data on startup. Access to the app is already
+   * gated by the server middleware (which redirects to /login when there is no
+   * session), and the repository bounces any runtime 401 to /login too.
+   */
   async bootstrap() {
     try {
       const me = await this.#repo.me();
-      await this.#enter(me);
+      this.currentUser = { username: me.username };
+      const workspaces = await this.#repo.listWorkspaces();
+      this.workspaces = AppStore.#sortByName(workspaces);
+      this.currentWorkspaceId =
+        workspaces.find((w) => w.id === me.activeWorkspaceId)?.id ??
+        workspaces[0]?.id ??
+        null;
+      await this.loadWorkspaceData();
     } catch (e) {
-      this.currentUser = null;
       if (e?.status !== 401) console.error(e);
     } finally {
       this.ready = true;
     }
   }
 
-  async login(username, password) {
-    await this.#enter(await this.#repo.login(username, password));
-  }
-
-  async register(username, password) {
-    await this.#enter(await this.#repo.register(username, password));
-  }
-
-  /** Adopt an authenticated identity and load its workspace data. */
-  async #enter({ username, activeWorkspaceId }) {
-    this.currentUser = { username };
-    const workspaces = await this.#repo.listWorkspaces();
-    this.workspaces = AppStore.#sortByName(workspaces);
-    this.currentWorkspaceId =
-      workspaces.find((w) => w.id === activeWorkspaceId)?.id ??
-      workspaces[0]?.id ??
-      null;
-    await this.loadWorkspaceData();
-  }
-
-  async logout() {
-    try {
-      await this.#repo.logout();
-    } finally {
-      this.#reset();
-    }
+  /** Sign out of this device (server clears the session and redirects). */
+  logout() {
+    window.location.assign('/logout');
   }
 
   /** Sign out every other session, keeping this one active. */
@@ -125,20 +112,10 @@ export class AppStore {
     return this.#repo.changePassword(currentPassword, newPassword);
   }
 
-  /** Permanently delete the account and all its data, then drop to login. */
+  /** Permanently delete the account and all its data, then return to login. */
   async deleteAccount(password) {
     await this.#repo.deleteAccount(password);
-    this.#reset();
-  }
-
-  /** Clear all per-user state (back to the logged-out shell). */
-  #reset() {
-    this.currentUser = null;
-    this.entries = [];
-    this.projects = [];
-    this.tags = [];
-    this.workspaces = [];
-    this.currentWorkspaceId = null;
+    window.location.assign('/login');
   }
 
   /** Load every dataset (projects, tags, entries) for the current workspace. */
