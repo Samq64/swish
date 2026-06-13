@@ -167,6 +167,15 @@
           <Icon name="plus" size={15} /> New
         </button>
       </div>
+
+      {#if store.currentUser}
+        <div class="account">
+          <span class="who" title={store.currentUser.username}>
+            {store.currentUser.username}
+          </span>
+          <button class="logout" onclick={() => store.logout()}>Log out</button>
+        </div>
+      {/if}
       <input
         type="file"
         accept="application/json,.json"
@@ -347,5 +356,35 @@
   }
   .bottom button:hover {
     background: var(--bg);
+  }
+  .account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+  .who {
+    min-width: 0;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .logout {
+    flex: none;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: var(--space-1);
+  }
+  .logout:hover {
+    text-decoration: underline;
   }
 </style>

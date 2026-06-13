@@ -1,13 +1,12 @@
 /**
  * Data contract for the app. Everything above this line (store, components)
  * depends only on these async method shapes — never on *how* data is stored.
+ * The live implementation is {@link module:apiRepository}, backed by the
+ * Cloudflare Pages Functions API; the store talks only to this contract.
  *
- * Swapping to a real backend later means writing an `apiRepository` with the
- * same methods (using `fetch`) and passing it to `createStore`. Nothing in the
- * UI changes.
- *
- * Entries, projects and tags all belong to a workspace; the repository scopes
- * reads/writes by `workspaceId` so switching workspace swaps the whole dataset.
+ * Entries, projects and tags all belong to a workspace; everything is scoped to
+ * the authenticated user server-side. The id of each record is assigned by the
+ * server on create.
  *
  * @typedef {Object} Workspace
  * @property {string} id
@@ -33,7 +32,19 @@
  * @property {string} workspaceId
  * @property {string} name
  *
+ * @typedef {Object} Identity
+ * @property {string} username
+ * @property {string|null} activeWorkspaceId
+ *
  * @typedef {Object} Repository
+ * // auth
+ * @property {(username: string, password: string) => Promise<Identity>} register
+ * @property {(username: string, password: string) => Promise<Identity>} login
+ * @property {() => Promise<void>} logout
+ * @property {() => Promise<Identity>} me  Rejects with status 401 when no session
+ * // entries — listEntries returns every entry whose start is in [from, to),
+ * // PLUS the open running entry (end === null) regardless of range, so the
+ * // timer is consistent across devices and views.
  * @property {(range: {from: string, to: string, workspaceId: string}) => Promise<TimeEntry[]>} listEntries
  * @property {(data: Partial<TimeEntry>) => Promise<TimeEntry>} createEntry
  * @property {(id: string, patch: Partial<TimeEntry>) => Promise<TimeEntry>} updateEntry
@@ -50,10 +61,7 @@
  * @property {(data: Partial<Workspace>) => Promise<Workspace>} createWorkspace
  * @property {(id: string, patch: Partial<Workspace>) => Promise<Workspace>} updateWorkspace
  * @property {(id: string) => Promise<void>} deleteWorkspace
- * @property {() => Promise<string>} getActiveWorkspaceId
  * @property {(id: string) => Promise<void>} setActiveWorkspaceId
- * @property {() => Promise<boolean>} getOnboarded
- * @property {() => Promise<void>} setOnboarded
  * @property {(workspaceId: string) => Promise<WorkspaceExport>} exportWorkspace
  * @property {(payload: WorkspaceExport) => Promise<Workspace>} importWorkspace
  *
@@ -66,9 +74,4 @@
  * @property {TimeEntry[]} entries
  */
 
-/** Generate a client-side id. A backend would assign its own on create. */
-export function newId(prefix = 'e') {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
-}
+export {};

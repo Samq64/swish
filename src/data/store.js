@@ -1,8 +1,7 @@
 import { AppStore } from './store.svelte.js';
-import { createLocalRepository } from './localRepository.js';
+import { createApiRepository } from './apiRepository.js';
 
 /**
- * The shared store instance for the app. Today it's wired to localStorage;
- * to move to a backend, swap this one line for `createApiRepository(...)`.
+ * The shared store instance for the app, wired to the Cloudflare API backend.
  */
-export const store = new AppStore(createLocalRepository());
+export const store = new AppStore(createApiRepository());

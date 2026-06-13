@@ -21,8 +21,10 @@ export class AppStore {
   workspaces = $state([]);
   /** Id of the workspace whose data is currently loaded. */
   currentWorkspaceId = $state(null);
-  /** Whether the user has seen onboarding (defaults true to avoid a flash). */
-  onboarded = $state(true);
+  /** The signed-in user ({ username }), or null when logged out. */
+  currentUser = $state(null);
+  /** False until the initial session check resolves (avoids a login flash). */
+  ready = $state(false);
   /** 'week' | 'day' | 'list' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
@@ -70,24 +72,52 @@ export class AppStore {
     return [...arr].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async init() {
-    const [workspaces, active, onboarded] = await Promise.all([
-      this.#repo.listWorkspaces(),
-      this.#repo.getActiveWorkspaceId(),
-      this.#repo.getOnboarded(),
-    ]);
+  // --- auth & bootstrap ------------------------------------------------------
+
+  /** Check for an existing session on startup and load data if signed in. */
+  async bootstrap() {
+    try {
+      const me = await this.#repo.me();
+      await this.#enter(me);
+    } catch (e) {
+      this.currentUser = null;
+      if (e?.status !== 401) console.error(e);
+    } finally {
+      this.ready = true;
+    }
+  }
+
+  async login(username, password) {
+    await this.#enter(await this.#repo.login(username, password));
+  }
+
+  async register(username, password) {
+    await this.#enter(await this.#repo.register(username, password));
+  }
+
+  /** Adopt an authenticated identity and load its workspace data. */
+  async #enter({ username, activeWorkspaceId }) {
+    this.currentUser = { username };
+    const workspaces = await this.#repo.listWorkspaces();
     this.workspaces = AppStore.#sortByName(workspaces);
-    this.onboarded = onboarded;
     this.currentWorkspaceId =
-      workspaces.find((w) => w.id === active)?.id ??
+      workspaces.find((w) => w.id === activeWorkspaceId)?.id ??
       workspaces[0]?.id ??
       null;
     await this.loadWorkspaceData();
   }
 
-  async dismissOnboarding() {
-    this.onboarded = true;
-    await this.#repo.setOnboarded();
+  async logout() {
+    try {
+      await this.#repo.logout();
+    } finally {
+      this.currentUser = null;
+      this.entries = [];
+      this.projects = [];
+      this.tags = [];
+      this.workspaces = [];
+      this.currentWorkspaceId = null;
+    }
   }
 
   /** Load every dataset (projects, tags, entries) for the current workspace. */
@@ -203,14 +233,21 @@ export class AppStore {
 
   /**
    * Optimistically patch the item with `id` in a state array (`entries` |
-   * `projects` | `tags`): apply the change immediately, then reconcile with the
-   * value the repository returns.
+   * `projects` | `tags`): apply the change immediately, reconcile with the
+   * value the repository returns, and revert to the prior state if it fails
+   * (so a dropped request never leaves the UI lying about server state).
    */
   async #patch(field, id, patch, repoFn) {
-    this[field] = this[field].map((x) => (x.id === id ? { ...x, ...patch } : x));
-    const saved = await repoFn(id, patch);
-    this[field] = this[field].map((x) => (x.id === id ? saved : x));
-    return saved;
+    const prev = this[field];
+    this[field] = prev.map((x) => (x.id === id ? { ...x, ...patch } : x));
+    try {
+      const saved = await repoFn(id, patch);
+      this[field] = this[field].map((x) => (x.id === id ? saved : x));
+      return saved;
+    } catch (e) {
+      this[field] = prev;
+      throw e;
+    }
   }
 
   update(id, patch) {
@@ -220,8 +257,14 @@ export class AppStore {
   }
 
   async remove(id) {
-    this.entries = this.entries.filter((e) => e.id !== id);
-    await this.#repo.deleteEntry(id);
+    const prev = this.entries;
+    this.entries = prev.filter((e) => e.id !== id);
+    try {
+      await this.#repo.deleteEntry(id);
+    } catch (e) {
+      this.entries = prev;
+      throw e;
+    }
   }
 
   /** Stop a running entry by stamping its end time. */
@@ -249,12 +292,20 @@ export class AppStore {
   }
 
   async removeProject(id) {
-    this.projects = this.projects.filter((p) => p.id !== id);
+    const prevProjects = this.projects;
+    const prevEntries = this.entries;
+    this.projects = prevProjects.filter((p) => p.id !== id);
     // Detach the project from any entries that referenced it.
-    this.entries = this.entries.map((e) =>
+    this.entries = prevEntries.map((e) =>
       e.projectId === id ? { ...e, projectId: null } : e,
     );
-    await this.#repo.deleteProject(id);
+    try {
+      await this.#repo.deleteProject(id);
+    } catch (e) {
+      this.projects = prevProjects;
+      this.entries = prevEntries;
+      throw e;
+    }
   }
 
   // --- tags (global, shared across all projects) -----------------------------
@@ -277,13 +328,21 @@ export class AppStore {
   }
 
   async removeTag(id) {
-    this.tags = this.tags.filter((t) => t.id !== id);
+    const prevTags = this.tags;
+    const prevEntries = this.entries;
+    this.tags = prevTags.filter((t) => t.id !== id);
     // Detach the tag from any loaded entries that referenced it.
-    this.entries = this.entries.map((e) =>
+    this.entries = prevEntries.map((e) =>
       e.tagIds?.includes(id)
         ? { ...e, tagIds: e.tagIds.filter((t) => t !== id) }
         : e,
     );
-    await this.#repo.deleteTag(id);
+    try {
+      await this.#repo.deleteTag(id);
+    } catch (e) {
+      this.tags = prevTags;
+      this.entries = prevEntries;
+      throw e;
+    }
   }
 }

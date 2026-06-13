@@ -10,9 +10,9 @@
   import ListView from './components/ListView.svelte';
   import ProjectsModal from './components/ProjectsModal.svelte';
   import TagsModal from './components/TagsModal.svelte';
-  import OnboardingModal from './components/OnboardingModal.svelte';
+  import AuthView from './components/AuthView.svelte';
 
-  store.init();
+  store.bootstrap();
 
   let showProjects = $state(false);
   let showTags = $state(false);
@@ -58,6 +58,11 @@
   );
 </script>
 
+{#if !store.ready}
+  <!-- Initial session check; brief, render nothing to avoid a flash. -->
+{:else if !store.currentUser}
+  <AuthView />
+{:else}
 <header class="topbar">
   <WorkspaceSelector />
   <div class="timer-slot"><TimerBar /></div>
@@ -126,8 +131,6 @@
 {#if showTags}
   <TagsModal onClose={() => (showTags = false)} />
 {/if}
-{#if !store.onboarded}
-  <OnboardingModal onClose={() => store.dismissOnboarding()} />
 {/if}
 
 <style>

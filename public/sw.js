@@ -5,7 +5,7 @@
  *
  * Bump CACHE to invalidate old caches on the next deploy.
  */
-const CACHE = 'tt-cache-v1';
+const CACHE = 'tt-cache-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -30,7 +30,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
-  if (new URL(request.url).origin !== self.location.origin) return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  // Never cache the API — data and auth must always come from the network.
+  if (url.pathname.startsWith('/api/')) return;
 
   // Navigations: network-first (get fresh HTML when online), fall back to the
   // cached shell when offline.
