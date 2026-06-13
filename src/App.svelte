@@ -84,14 +84,14 @@
   </div>
 
   <div class="view-toggle" role="group" aria-label="View">
-    <button class:active={store.view === 'day'} onclick={() => store.setView('day')}>
-      Day
-    </button>
     <button
       class:active={store.view === 'week'}
       onclick={() => store.setView('week')}
     >
       Week
+    </button>
+    <button class:active={store.view === 'day'} onclick={() => store.setView('day')}>
+      Day
     </button>
     <button
       class:active={store.view === 'list'}

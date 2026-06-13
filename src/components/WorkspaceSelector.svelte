@@ -9,8 +9,6 @@
    */
 
   let open = $state(false);
-  let creating = $state(false);
-  let newName = $state('');
   let renamingId = $state(null);
   let renameName = $state('');
 
@@ -20,8 +18,6 @@
 
   function close() {
     open = false;
-    creating = false;
-    newName = '';
     renamingId = null;
     renameName = '';
   }
@@ -31,16 +27,16 @@
     close();
   }
 
-  async function create() {
-    const name = newName.trim();
-    if (!name) return;
-    await store.addWorkspace(name);
-    close();
-  }
-
   function startRename(w) {
     renamingId = w.id;
     renameName = w.name;
+  }
+
+  // Create a workspace and drop straight into inline-renaming the new row,
+  // so there's no separate "name it" text box hijacking the footer.
+  async function createNew() {
+    const ws = await store.addWorkspace('New workspace');
+    startRename(ws);
   }
 
   async function saveRename(id) {
@@ -97,7 +93,7 @@
     class="trigger"
     aria-expanded={open}
     aria-label="Switch workspace"
-    onclick={() => (open = !open)}
+    onclick={() => (open ? close() : (open = true))}
   >
     <span class="avatar">{initial(store.currentWorkspace?.name)}</span>
     <span class="name">{store.currentWorkspace?.name ?? 'Workspace'}</span>
@@ -155,29 +151,10 @@
         {/each}
       </div>
 
-      {#if creating}
-        <input
-          class="new-input"
-          type="text"
-          placeholder="Workspace name…"
-          bind:value={newName}
-          use:autofocus
-          onkeydown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              create();
-            } else if (e.key === 'Escape') {
-              creating = false;
-              newName = '';
-            }
-          }}
-        />
-      {:else}
-        <div class="bottom">
-          <button onclick={() => fileInput.click()}>Import…</button>
-          <button onclick={() => (creating = true)}>+ New</button>
-        </div>
-      {/if}
+      <div class="bottom">
+        <button onclick={() => fileInput.click()}>Import…</button>
+        <button onclick={createNew}>+ New</button>
+      </div>
       <input
         type="file"
         accept="application/json,.json"
@@ -333,14 +310,6 @@
     text-align: center;
     color: var(--accent);
     font-weight: 700;
-  }
-  .new-input {
-    width: 100%;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    font-size: 14px;
-    margin-top: var(--space-2);
   }
   .rename-input {
     width: 100%;

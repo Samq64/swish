@@ -88,45 +88,54 @@
 
 <div class="list-view">
   <div class="filter-bar">
-    <div class="filter-row">
-      <span class="filter-label">Project</span>
-      {#each store.projects as p (p.id)}
+    <div class="filter-rows">
+      <div class="filter-row">
+        <span class="filter-label">Project</span>
+        {#each store.projects as p (p.id)}
+          <button
+            type="button"
+            class="chip"
+            class:on={filterProjectIds.has(p.id)}
+            onclick={() => toggleProject(p.id)}
+          >
+            <span class="dot" style:background={p.color}></span>
+            {p.name}
+          </button>
+        {/each}
         <button
           type="button"
           class="chip"
-          class:on={filterProjectIds.has(p.id)}
-          onclick={() => toggleProject(p.id)}
+          class:on={filterProjectIds.has(NO_PROJECT)}
+          onclick={() => toggleProject(NO_PROJECT)}
         >
-          <span class="dot" style:background={p.color}></span>
-          {p.name}
+          No project
         </button>
-      {/each}
-      <button
-        type="button"
-        class="chip"
-        class:on={filterProjectIds.has(NO_PROJECT)}
-        onclick={() => toggleProject(NO_PROJECT)}
-      >
-        No project
-      </button>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Tags</span>
+        {#if store.tags.length}
+          {#each store.tags as t (t.id)}
+            <button
+              type="button"
+              class="chip"
+              class:on={filterTagIds.has(t.id)}
+              onclick={() => toggleTag(t.id)}
+            >
+              {t.name}
+            </button>
+          {/each}
+        {:else}
+          <span class="filter-empty">No tags yet</span>
+        {/if}
+      </div>
     </div>
 
-    <div class="filter-row">
-      <span class="filter-label">Tags</span>
-      {#each store.tags as t (t.id)}
-        <button
-          type="button"
-          class="chip"
-          class:on={filterTagIds.has(t.id)}
-          onclick={() => toggleTag(t.id)}
-        >
-          {t.name}
-        </button>
-      {/each}
-      {#if anyFilter}
-        <button class="clear" onclick={clearFilters}>Clear all</button>
-      {/if}
-    </div>
+    <!-- Always rendered (visibility-toggled) so toggling filters never shifts
+         the list vertically. -->
+    <button class="clear" class:invisible={!anyFilter} onclick={clearFilters}>
+      Clear all
+    </button>
   </div>
 
   <div class="scroll">
@@ -206,16 +215,28 @@
 
   .filter-bar {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-3);
     padding: var(--space-3) var(--space-5);
     border-bottom: 1px solid var(--border);
+  }
+  .filter-rows {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
   .filter-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
+  }
+  .filter-empty {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
   }
   .filter-label {
     font-size: 13px;
@@ -247,11 +268,21 @@
     font-weight: 600;
   }
   .clear {
-    border: none;
-    background: none;
+    flex: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
     color: var(--accent);
     font-size: 12px;
-    margin-left: var(--space-1);
+    font-weight: 600;
+    padding: var(--space-1) var(--space-3);
+    cursor: pointer;
+  }
+  .clear:hover {
+    background: var(--bg);
+  }
+  .clear.invisible {
+    visibility: hidden;
   }
 
   .scroll {
