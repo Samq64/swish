@@ -8,13 +8,13 @@
    */
   let { mode, form = null } = $props();
 
-  const isLogin = mode === 'login';
-  const title = isLogin ? 'Welcome back' : 'Create your account';
-  const submit = isLogin ? 'Sign in' : 'Sign up';
-  const pwAutocomplete = isLogin ? 'current-password' : 'new-password';
-  const switchText = isLogin ? 'New here?' : 'Already have an account?';
-  const switchHref = isLogin ? '/register' : '/login';
-  const switchLabel = isLogin ? 'Create an account' : 'Sign in';
+  let isLogin = $derived(mode === 'login');
+  let title = $derived(isLogin ? 'Welcome back' : 'Create your account');
+  let submit = $derived(isLogin ? 'Sign in' : 'Sign up');
+  let pwAutocomplete = $derived(isLogin ? 'current-password' : 'new-password');
+  let switchText = $derived(isLogin ? 'New here?' : 'Already have an account?');
+  let switchHref = $derived(isLogin ? '/register' : '/login');
+  let switchLabel = $derived(isLogin ? 'Create an account' : 'Sign in');
 </script>
 
 <svelte:head>

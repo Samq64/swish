@@ -1,5 +1,6 @@
 <script>
   import { fade } from 'svelte/transition';
+  import { untrack } from 'svelte';
   import { store } from '../data/store.js';
   import { formatDuration } from '../lib/time.js';
   import { entryDurationMin } from '../lib/entries.js';
@@ -14,7 +15,10 @@
   import WorkspacesModal from '../components/WorkspacesModal.svelte';
 
   let { data } = $props();
-  store.hydrate(data);
+  // One-time seed from the server load; intentionally reads the initial `data`
+  // only (untrack), and stays synchronous so the page server-renders with
+  // content rather than the not-ready placeholder.
+  untrack(() => store.hydrate(data));
 
   // Reflect the user's theme onto <html>; 'auto' drops the attribute so app.css
   // falls back to the OS preference.
