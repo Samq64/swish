@@ -1,16 +1,17 @@
-// Session resolution and creation, shared by the API router and the
-// server-rendered auth pages (login/register/logout).
+// Session resolution/creation and the session cookie, shared by the API router,
+// hooks, and the auth routes (login/register/logout).
 
-import {
-  sha256b64url,
-  newSessionToken,
-  readSessionCookie,
-  SESSION_TTL_MS,
-} from './auth.js';
+import { sha256b64url, newSessionToken, SESSION_TTL_MS, COOKIE_NAME } from './auth.js';
 
-/** The authenticated user for a request, or null. */
-export async function resolveUser(env, request) {
-  const token = readSessionCookie(request);
+const COOKIE_OPTS = {
+  path: '/',
+  httpOnly: true,
+  secure: true, // allowed on http://localhost too
+  sameSite: 'lax',
+};
+
+/** Resolve the user for a raw session token, or null. Reaps the row if expired. */
+export async function resolveUser(env, token) {
   if (!token) return null;
   const id = await sha256b64url(token);
   const row = await env.DB.prepare(
@@ -47,4 +48,18 @@ export async function createSession(env, userId) {
     env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(nowIso),
   ]);
   return token;
+}
+
+/** Delete the session backing `token` (if any). */
+export async function destroySession(env, token) {
+  if (!token) return;
+  await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(await sha256b64url(token)).run();
+}
+
+export function setSessionCookie(cookies, token) {
+  cookies.set(COOKIE_NAME, token, { ...COOKIE_OPTS, maxAge: Math.floor(SESSION_TTL_MS / 1000) });
+}
+
+export function clearSessionCookie(cookies) {
+  cookies.delete(COOKIE_NAME, COOKIE_OPTS);
 }

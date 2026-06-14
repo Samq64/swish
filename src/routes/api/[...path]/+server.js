@@ -1,21 +1,15 @@
-// swish API — a single catch-all Pages Function serving /api/*.
+// swish API — a single SvelteKit endpoint serving /api/*.
 //
-// Pipeline: top-level error boundary → CSRF/origin check → session resolution →
-// per-resource handler. Every data query is scoped to the authenticated user:
-// `workspaceId` from the client is treated as a claim to authorize, never as a
-// trusted scope, and ids referenced in a body (projectId/tagIds) are verified
-// to live in the same workspace.
+// Pipeline: top-level error boundary → CSRF/origin check → per-resource handler.
+// The session is resolved once in hooks.server.js (event.locals.user). Every
+// data query is scoped to the authenticated user: `workspaceId` from the client
+// is a claim to authorize, never a trusted scope, and ids referenced in a body
+// (projectId/tagIds) are verified to live in the same workspace.
 
-import { json, error, readJson, sameOrigin } from '../_lib/http.js';
-import { isIso, isStr, isStrArray, isHexColor } from '../_lib/validate.js';
-import {
-  hashPassword,
-  verifyPassword,
-  sha256b64url,
-  clearSessionCookie,
-  readSessionCookie,
-} from '../_lib/auth.js';
-import { resolveUser } from '../_lib/session.js';
+import { json, error, readJson, sameOrigin } from '$lib/server/http.js';
+import { isIso, isStr, isStrArray, isHexColor } from '$lib/server/validate.js';
+import { hashPassword, verifyPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
+import { clearSessionCookie } from '$lib/server/session.js';
 
 const DEFAULT_COLOR = '#6c5ce7';
 const NAME_MAX = 200;
@@ -24,41 +18,43 @@ const DESC_MAX = 2000;
 // runtime's bound-statement limit). See importWorkspace.
 const IMPORT_BATCH_SIZE = 50;
 
-export async function onRequest(context) {
+// One handler for every method; the router dispatches on path + method.
+export async function fallback(event) {
   try {
-    return await route(context);
+    return await route(event);
   } catch {
     // Never leak a stack to the client; surface a generic 500.
     return error(500, 'Internal error');
   }
 }
 
-async function route(context) {
-  const { request, env, params } = context;
+async function route(event) {
+  const { request, platform, params, locals } = event;
+  const ctx = { env: platform.env, request, cookies: event.cookies };
   const method = request.method;
-  const segs = params.path || [];
+  const segs = (params.path || '').split('/').filter(Boolean);
 
   if (method !== 'GET' && method !== 'HEAD' && !sameOrigin(request)) {
     return error(403, 'Bad origin');
   }
 
-  // Auth routes are reachable without an existing session.
-  if (segs[0] === 'auth') return handleAuth(context, segs.slice(1), method);
+  // Auth routes handle their own (un)authenticated cases.
+  if (segs[0] === 'auth') return handleAuth(ctx, segs.slice(1), method, locals.user);
 
-  const user = await resolveUser(env, request);
+  const user = locals.user;
   if (!user) return error(401, 'Not authenticated');
 
   switch (segs[0]) {
     case 'entries':
-      return handleEntries(context, segs.slice(1), method, user);
+      return handleEntries(ctx, segs.slice(1), method, user);
     case 'projects':
-      return handleScoped(context, 'projects', segs.slice(1), method, user);
+      return handleScoped(ctx, 'projects', segs.slice(1), method, user);
     case 'tags':
-      return handleScoped(context, 'tags', segs.slice(1), method, user);
+      return handleScoped(ctx, 'tags', segs.slice(1), method, user);
     case 'workspaces':
-      return handleWorkspaces(context, segs.slice(1), method, user);
+      return handleWorkspaces(ctx, segs.slice(1), method, user);
     case 'settings':
-      return handleSettings(context, segs.slice(1), method, user);
+      return handleSettings(ctx, segs.slice(1), method, user);
     default:
       return error(404, 'Not found');
   }
@@ -532,30 +528,30 @@ async function handleSettings(ctx, rest, method, user) {
   return error(404, 'Not found');
 }
 
-// --- auth --------------------------------------------------------------------
+// --- auth (account actions for the signed-in user) ---------------------------
 
-async function handleAuth(ctx, rest, method) {
-  const { env, request } = ctx;
+async function handleAuth(ctx, rest, method, user) {
+  const { env, request, cookies } = ctx;
   const action = rest[0];
 
   if (action === 'me' && method === 'GET') {
-    const user = await resolveUser(env, request);
     if (!user) return error(401, 'Not authenticated');
     return json({ username: user.username, activeWorkspaceId: user.activeWorkspaceId });
   }
 
-  // Sign in / sign up / sign out are server-rendered routes (/login, /register,
-  // /logout), not API calls. The remaining actions operate on the signed-in
-  // account.
-  const user = await resolveUser(env, request);
+  // Sign in / sign up / sign out are routes (/login, /register, /logout). The
+  // remaining actions operate on the signed-in account.
   if (!user) return error(401, 'Not authenticated');
+
+  const currentSid = async () => {
+    const token = cookies.get(COOKIE_NAME);
+    return token ? await sha256b64url(token) : '';
+  };
 
   if (action === 'logout-others' && method === 'POST') {
     // Revoke every session except this one — the current device stays signed in.
-    const token = readSessionCookie(request);
-    const currentSid = token ? await sha256b64url(token) : '';
     await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
-      .bind(user.id, currentSid)
+      .bind(user.id, await currentSid())
       .run();
     return json({ ok: true });
   }
@@ -577,13 +573,11 @@ async function handleAuth(ctx, rest, method) {
     if (!ok) return error(403, 'Current password is incorrect');
     const pw = await hashPassword(newPassword, env.PEPPER);
     // Keep this session; revoke every other one as a precaution.
-    const token = readSessionCookie(request);
-    const currentSid = token ? await sha256b64url(token) : '';
     await env.DB.batch([
       env.DB
         .prepare('UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iterations = ? WHERE id = ?')
         .bind(pw.hash, pw.salt, pw.iterations, user.id),
-      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(user.id, currentSid),
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(user.id, await currentSid()),
     ]);
     return json({ ok: true });
   }
@@ -603,7 +597,8 @@ async function handleAuth(ctx, rest, method) {
     if (!ok) return error(403, 'Password is incorrect');
     // FK cascade drops the user's sessions, workspaces, projects, tags, entries.
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
-    return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
+    clearSessionCookie(cookies);
+    return json({ ok: true });
   }
 
   return error(404, 'Not found');

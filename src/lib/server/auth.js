@@ -1,10 +1,11 @@
-// Authentication primitives: password hashing (PBKDF2 via WebCrypto), session
-// tokens, and the session cookie. No third-party dependencies.
+// Authentication primitives: password hashing (PBKDF2 via WebCrypto) and
+// session tokens. Cookie I/O lives in session.js (SvelteKit's `cookies`). No
+// third-party dependencies.
 
 const te = new TextEncoder();
 
-const COOKIE_NAME = 'swish_session';
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+export const COOKIE_NAME = 'swish_session';
+export const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 // The Cloudflare Workers runtime caps PBKDF2 at 100,000 iterations. We store
 // the count per user (pw_iterations), so this can rise later if the cap does.
 const PBKDF2_ITERATIONS = 100_000;
@@ -83,26 +84,4 @@ function timingSafeEqual(a, b) {
 /** A fresh high-entropy session token (the raw value goes in the cookie). */
 export function newSessionToken() {
   return b64urlEncode(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-export { SESSION_TTL_MS };
-
-export function readSessionCookie(request) {
-  const header = request.headers.get('Cookie') || '';
-  for (const part of header.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq === -1) continue;
-    if (part.slice(0, eq).trim() === COOKIE_NAME) return part.slice(eq + 1).trim();
-  }
-  return null;
-}
-
-export function sessionCookie(token) {
-  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  // Host-only (no Domain attribute); Secure is allowed on http://localhost.
-  return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
-}
-
-export function clearSessionCookie() {
-  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }

@@ -20,12 +20,12 @@ export async function readJson(request) {
 }
 
 /**
- * CSRF defence for cookie-authenticated mutations: require the request's
- * `Origin` to share our hostname. A cross-site attacker's Origin (set by the
- * browser, unforgeable) never matches our host, so this blocks CSRF while
- * still allowing local dev where the Vite HMR server and the API live on the
- * same host but different ports. Same-origin requests that omit `Origin` are
- * allowed.
+ * Origin check for the JSON API. SvelteKit's built-in CSRF protection only
+ * guards form-type submissions (form-urlencoded/multipart/text-plain), not
+ * `application/json`, so this closes that gap explicitly for our cookie-authed
+ * mutations rather than relying on the browser's CORS preflight alone. A
+ * cross-site attacker's Origin (set by the browser, unforgeable) never matches
+ * our host. Same-origin requests that omit Origin are allowed.
  */
 export function sameOrigin(request) {
   const origin = request.headers.get('Origin');

@@ -1,17 +1,17 @@
 <script>
   import { fade } from 'svelte/transition';
-  import { store } from './data/store.js';
-  import { formatDuration } from './lib/time.js';
-  import { entryDurationMin } from './lib/entries.js';
-  import Icon from './lib/Icon.svelte';
-  import TimerBar from './components/TimerBar.svelte';
-  import WorkspaceSelector from './components/WorkspaceSelector.svelte';
-  import TimelineView from './components/TimelineView.svelte';
-  import ListView from './components/ListView.svelte';
-  import ProjectsModal from './components/ProjectsModal.svelte';
-  import TagsModal from './components/TagsModal.svelte';
-  import SettingsModal from './components/SettingsModal.svelte';
-  import WorkspacesModal from './components/WorkspacesModal.svelte';
+  import { store } from '../data/store.js';
+  import { formatDuration } from '../lib/time.js';
+  import { entryDurationMin } from '../lib/entries.js';
+  import Icon from '../lib/Icon.svelte';
+  import TimerBar from '../components/TimerBar.svelte';
+  import WorkspaceSelector from '../components/WorkspaceSelector.svelte';
+  import TimelineView from '../components/TimelineView.svelte';
+  import ListView from '../components/ListView.svelte';
+  import ProjectsModal from '../components/ProjectsModal.svelte';
+  import TagsModal from '../components/TagsModal.svelte';
+  import SettingsModal from '../components/SettingsModal.svelte';
+  import WorkspacesModal from '../components/WorkspacesModal.svelte';
 
   store.bootstrap();
 
@@ -60,6 +60,10 @@
       .reduce((sum, e) => sum + entryDurationMin(e), 0),
   );
 </script>
+
+<svelte:head>
+  <title>Time Tracker</title>
+</svelte:head>
 
 {#if !store.ready}
   <!-- Loading the signed-in user's data; the middleware already gated access. -->

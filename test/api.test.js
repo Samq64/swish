@@ -1,11 +1,12 @@
 /**
- * End-to-end tests for the Pages Functions backend, run against a real local
- * `wrangler pages dev` server backed by an isolated local D1 database.
+ * End-to-end tests for the SvelteKit backend, run against a real local
+ * `wrangler pages dev` server (the adapter-cloudflare build) backed by an
+ * isolated local D1 database.
  *
  *   npm test
  *
- * Covers the server-rendered auth routes (/login, /register, /logout), the
- * middleware that gates the app shell, and the JSON API.
+ * Covers the auth routes (/login, /register, /logout), the hook that gates the
+ * app shell, and the JSON API.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,9 +50,16 @@ async function api(method, path, { body, cookie, origin = ORIGIN } = {}) {
   return { status: res.status, json, cookie: sessionCookie(res) };
 }
 
-// Form POST to an auth route; captures the 302 + Set-Cookie.
+// Form POST to an auth route; captures the redirect + Set-Cookie. `Accept:
+// text/html` mimics a browser form navigation, so SvelteKit replies with a real
+// redirect rather than its JSON action envelope (which it serves to fetch/JSON
+// clients via content negotiation).
 async function form(path, fields, { cookie, origin = ORIGIN } = {}) {
-  const headers = { 'content-type': 'application/x-www-form-urlencoded', origin };
+  const headers = {
+    'content-type': 'application/x-www-form-urlencoded',
+    accept: 'text/html',
+    origin,
+  };
   if (cookie) headers.cookie = cookie;
   const res = await fetch(BASE + path, {
     method: 'POST',
@@ -68,13 +76,15 @@ async function form(path, fields, { cookie, origin = ORIGIN } = {}) {
 
 async function registerUser(username, password) {
   const r = await form('/register', { username, password });
-  assert.equal(r.status, 302, `register ${username} should redirect`);
+  assert.equal(r.status, 303, `register ${username} should redirect`);
   assert.ok(r.cookie, `register ${username} should set a session cookie`);
   return r.cookie;
 }
 
 before(async () => {
   rmSync(STATE, { recursive: true, force: true });
+  // Build the Pages output the dev server will serve.
+  execFileSync('npx', ['vite', 'build'], { stdio: 'ignore' });
   execFileSync(
     'npx',
     ['wrangler', 'd1', 'migrations', 'apply', 'swish', '--local', '--persist-to', STATE],
@@ -82,10 +92,10 @@ before(async () => {
   );
   server = spawn(
     'npx',
-    ['wrangler', 'pages', 'dev', 'public', '--port', String(PORT), '--persist-to', STATE],
+    ['wrangler', 'pages', 'dev', '.svelte-kit/cloudflare', '--port', String(PORT), '--persist-to', STATE],
     { stdio: 'ignore' },
   );
-  const deadline = Date.now() + 40_000;
+  const deadline = Date.now() + 60_000;
   for (;;) {
     try {
       const r = await fetch(`${BASE}/api/auth/me`);
@@ -261,7 +271,7 @@ test('login rejects a wrong password and accepts the right one', async () => {
   assert.equal(bad.cookie, null);
 
   const good = await form('/login', { username: 'alice', password: 'hunter2pw' });
-  assert.equal(good.status, 302);
+  assert.equal(good.status, 303);
   assert.ok(good.cookie);
 });
 
@@ -272,7 +282,7 @@ test('logout clears the session and redirects to /login', async () => {
     headers: { cookie: throwaway, origin: ORIGIN },
     redirect: 'manual',
   });
-  assert.equal(res.status, 302);
+  assert.equal(res.status, 303);
   assert.match(res.headers.get('location'), /\/login$/);
   assert.equal((await api('GET', '/api/auth/me', { cookie: throwaway })).status, 401);
 });
@@ -299,7 +309,7 @@ test('changing password requires the current one and rotates credentials', async
   assert.equal(ok.status, 200);
 
   assert.equal((await form('/login', { username: 'alice', password: 'hunter2pw' })).status, 401);
-  assert.equal((await form('/login', { username: 'alice', password: 'brandnewpw9' })).status, 302);
+  assert.equal((await form('/login', { username: 'alice', password: 'brandnewpw9' })).status, 303);
 });
 
 test('deleting the account removes it and its data', async () => {

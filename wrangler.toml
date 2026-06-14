@@ -1,13 +1,12 @@
 # Cloudflare Pages configuration for swish.
 #
-# The static SPA is built to dist/; Pages Functions in functions/ are deployed
-# automatically and serve the API at /api/*. Local dev uses a local SQLite
-# simulation of D1 (no database_id needed); set database_id below after running
-#   npx wrangler d1 create swish
-# for remote deploys.
+# SvelteKit (adapter-cloudflare) builds a Pages deployment to
+# .svelte-kit/cloudflare; `vite dev` reads the bindings below via platformProxy.
+# Local dev uses a local SQLite simulation of D1 (no database_id needed); set
+# database_id below for remote deploys (npx wrangler d1 create swish).
 name = "swish"
 compatibility_date = "2024-09-23"
-pages_build_output_dir = "dist"
+pages_build_output_dir = ".svelte-kit/cloudflare"
 
 [[d1_databases]]
 binding = "DB"
