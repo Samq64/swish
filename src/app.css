@@ -1,17 +1,19 @@
 :root {
-  /* Let native controls (date/time/color inputs, checkboxes, scrollbars)
-     follow the active theme too. */
+  /* `color-scheme` drives both native controls (date/time inputs, scrollbars)
+     and every light-dark() token below. Default `light dark` follows the OS;
+     the [data-theme] rules force one side. Each colour token is defined once
+     via light-dark(light, dark). */
   color-scheme: light dark;
 
-  --bg: #f7f7fa;
-  --surface: #ffffff;
-  --border: #e6e6ee;
-  --text: #2d2d3a;
-  --muted: #8a8a9a;
-  --accent: #6c5ce7;
-  --no-project: #9ca3af;
-  --grid-line: #ededf3;
-  --grid-line-strong: #e0e0ea;
+  --bg: light-dark(#f7f7fa, #16161c);
+  --surface: light-dark(#ffffff, #1f1f29);
+  --border: light-dark(#e6e6ee, #34343f);
+  --text: light-dark(#2d2d3a, #e7e7ef);
+  --muted: light-dark(#8a8a9a, #9595a4);
+  --accent: light-dark(#6c5ce7, #8b7cf0);
+  --no-project: light-dark(#9ca3af, #6b7280);
+  --grid-line: light-dark(#ededf3, #2a2a33);
+  --grid-line-strong: light-dark(#e0e0ea, #3a3a46);
 
   /* Spacing scale (4px base) — use these instead of ad-hoc pixel values. */
   --space-1: 4px;
@@ -29,41 +31,13 @@
   color: var(--text);
 }
 
-/* Dark theme — only the colour tokens change; the spacing/radius scale and all
-   component CSS reference these. It applies in two cases: when the OS prefers
-   dark and the user hasn't forced a theme (the media query), and when the user
-   explicitly picks dark (the [data-theme] rule). The block is repeated because
-   CSS can't share declarations across an @media boundary. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --bg: #16161c;
-    --surface: #1f1f29;
-    --border: #34343f;
-    --text: #e7e7ef;
-    --muted: #9595a4;
-    --accent: #8b7cf0;
-    --no-project: #6b7280;
-    --grid-line: #2a2a33;
-    --grid-line-strong: #3a3a46;
-  }
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #16161c;
-  --surface: #1f1f29;
-  --border: #34343f;
-  --text: #e7e7ef;
-  --muted: #9595a4;
-  --accent: #8b7cf0;
-  --no-project: #6b7280;
-  --grid-line: #2a2a33;
-  --grid-line-strong: #3a3a46;
-}
-
-/* Forced light: keep the default tokens but stop native controls going dark. */
+/* An explicit user choice pins color-scheme, which flips every light-dark()
+   token. 'auto' leaves the default above (follows the OS). */
 :root[data-theme='light'] {
   color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 * {
