@@ -1,12 +1,13 @@
 // Session resolution/creation and the session cookie, shared by the API router,
 // hooks, and the auth routes (login/register/logout).
 
+import { dev } from '$app/environment';
 import { sha256b64url, newSessionToken, SESSION_TTL_MS, COOKIE_NAME } from './auth.js';
 
 const COOKIE_OPTS = {
   path: '/',
   httpOnly: true,
-  secure: true, // allowed on http://localhost too
+  secure: !dev,
   sameSite: 'lax',
 };
 
