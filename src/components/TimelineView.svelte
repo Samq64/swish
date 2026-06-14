@@ -67,6 +67,30 @@
     selectedId = id;
   }
 
+  // Each column registers its grid element here so an in-flight move (which is
+  // captured by its origin column) can map the cursor's X to the day it's now
+  // over — that's what lets a drag cross from one day's column into another.
+  let columnEls = new Map();
+  function registerColumn(iso, el) {
+    if (el) columnEls.set(iso, el);
+    else columnEls.delete(iso);
+  }
+  function dayAtX(clientX) {
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const [iso, el] of columnEls) {
+      const r = el.getBoundingClientRect();
+      if (clientX >= r.left && clientX < r.right) return iso;
+      // Dragged past the first/last column — clamp to the nearest real day.
+      const dist = clientX < r.left ? r.left - clientX : clientX - r.right;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = iso;
+      }
+    }
+    return nearest;
+  }
+
   // Keep `anchor` glued to the selected entry's block while it's open, so the
   // editor follows live drags/resizes and stays put during scrolls. `bounds` is
   // the safe region the editor may occupy: the scroll viewport minus the sticky
@@ -141,7 +165,13 @@
       </div>
 
       {#each store.visibleDays as iso (iso)}
-        <DayColumn dayISO={iso} {selectedId} onSelect={handleSelect} />
+        <DayColumn
+          dayISO={iso}
+          {selectedId}
+          onSelect={handleSelect}
+          {registerColumn}
+          {dayAtX}
+        />
       {/each}
     </div>
   </div>

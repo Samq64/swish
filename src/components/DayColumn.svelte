@@ -13,6 +13,7 @@
   } from '../lib/time.js';
   import { entryColor, entryTagNames } from '../lib/entries.js';
   import { clock } from '../lib/clock.svelte.js';
+  import { timelineDrag } from '../lib/timelineDrag.svelte.js';
   import TimeEntryBlock from './TimeEntryBlock.svelte';
 
   /**
@@ -21,20 +22,37 @@
    *   • drag empty space (mouse) -> create a sized entry in one gesture
    *   • hold empty space (touch) -> drop a default-length entry to resize later
    *   • drag an entry's edges    -> resize (extend / shrink) it
-   *   • drag an entry's body     -> move it (within the day)
+   *   • drag an entry's body     -> move it, even into another day's column
    *
    * Touch splits creating and resizing into two actions (a finicky drag-to-size
    * is hard with a finger); a mouse keeps the precise combined drag.
    *
+   * A move can cross days: this column keeps pointer capture for the whole
+   * gesture, asks `dayAtX` which day the cursor is over, and — once that differs
+   * from the origin day — hides its own copy of the block while the destination
+   * column renders the live one (see `movingBlock`). The drag lives in the
+   * shared `timelineDrag` singleton precisely so the other column can read it.
+   *
    * Selection is bubbled up via `onSelect` so a single editor can be shared
    * across all columns in the week.
    */
-  let { dayISO, selectedId = null, onSelect } = $props();
+  let { dayISO, selectedId = null, onSelect, registerColumn, dayAtX } = $props();
 
   let gridEl;
 
-  /** Live drag gesture, or null. @type {null | any} */
-  let drag = $state(null);
+  /**
+   * The live drag gesture (or null), shared across all columns. Reassign via
+   * `timelineDrag.start(...)` / `.clear()`; mutate fields (`drag.startMin = …`)
+   * directly — it's the same reactive proxy every column reads.
+   * @type {null | any}
+   */
+  let drag = $derived(timelineDrag.current);
+
+  // Publish this column's grid element so an in-flight move can locate it by X.
+  $effect(() => {
+    registerColumn?.(dayISO, gridEl);
+    return () => registerColumn?.(dayISO, null);
+  });
 
   /**
    * Lane layout snapshotted when a move/resize starts. While set, neighbours
@@ -64,14 +82,33 @@
 
   let entriesById = $derived(new Map(dayEntries.map((e) => [e.id, e])));
 
+  // Cross-day move bookkeeping. `movedAway`: an entry that started here is being
+  // dragged over another day, so we drop our copy and let that day render it.
+  // `movedHere`: a move that started elsewhere is now hovering this column, so
+  // we render the live block ourselves (`movingBlock`).
+  let movedAway = $derived(
+    drag?.mode === 'move' &&
+      drag.originDayISO === dayISO &&
+      drag.targetDayISO !== dayISO,
+  );
+  let movedHere = $derived(
+    drag?.mode === 'move' &&
+      drag.targetDayISO === dayISO &&
+      drag.originDayISO !== dayISO,
+  );
+  let movingEntry = $derived(
+    movedHere ? store.entries.find((e) => e.id === drag.entryId) : null,
+  );
+
   /**
    * Completed entries as timeline blocks. `order` is the creation-order index,
    * a stable key so lane columns don't swap when an entry is dragged. (The
-   * running entry has no end and lives in the TimerBar.)
+   * running entry has no end and lives in the TimerBar.) A block being dragged
+   * out to another day is dropped here — that day renders it instead.
    */
   function baseBlocks() {
     return dayEntries
-      .filter((e) => e.end)
+      .filter((e) => e.end && !(movedAway && e.id === drag.entryId))
       .map((e, i) => ({ ...toBlock(e), order: i }));
   }
 
@@ -116,16 +153,18 @@
   // Mouse only: drop a fresh create-drag anchored at `anchorMin` so the pointer
   // can size it before release.
   function startCreate(event, anchorMin, endMin = anchorMin) {
-    drag = {
+    timelineDrag.start({
       mode: 'create',
       entryId: null,
+      originDayISO: dayISO,
+      targetDayISO: dayISO,
       anchorMin,
       grabOffsetMin: 0,
       duration: 0,
       startMin: Math.min(anchorMin, endMin),
       endMin: Math.max(anchorMin, endMin),
       moved: false,
-    };
+    });
     gridEl.setPointerCapture?.(event.pointerId);
   }
 
@@ -182,7 +221,7 @@
   function onPointerCancel(event) {
     cancelLongPress();
     if (!drag) return;
-    drag = null;
+    timelineDrag.clear();
     frozenLanes = null;
     gridEl.releasePointerCapture?.(event.pointerId);
   }
@@ -192,16 +231,18 @@
     const m = pointerMinutes(event);
     // Snapshot the current layout so neighbours stay put for the whole gesture.
     frozenLanes = packLanes(baseBlocks());
-    drag = {
+    timelineDrag.start({
       mode,
       entryId: entry.id,
+      originDayISO: dayISO,
+      targetDayISO: dayISO,
       anchorMin: m,
       grabOffsetMin: m - b.startMin,
       duration: b.endMin - b.startMin,
       startMin: b.startMin,
       endMin: b.endMin,
       moved: false,
-    };
+    });
     capture(event);
   }
 
@@ -250,6 +291,8 @@
         );
         drag.startMin = ns;
         drag.endMin = ns + drag.duration;
+        // Which day's column is the cursor over now? That's where it lands.
+        drag.targetDayISO = dayAtX?.(event.clientX) ?? drag.originDayISO;
         break;
       }
     }
@@ -267,7 +310,7 @@
       return;
     }
     const d = drag;
-    drag = null;
+    timelineDrag.clear();
     frozenLanes = null;
     gridEl.releasePointerCapture?.(event.pointerId);
 
@@ -290,9 +333,12 @@
 
     if (d.entryId) {
       if (d.moved) {
+        // A move may have crossed days; resizes never leave their column, so
+        // targetDayISO stays the origin for them.
+        const day = d.targetDayISO ?? dayISO;
         await store.update(d.entryId, {
-          start: minutesToISO(dayISO, d.startMin),
-          end: minutesToISO(dayISO, d.endMin),
+          start: minutesToISO(day, d.startMin),
+          end: minutesToISO(day, d.endMin),
         });
       } else {
         onSelect?.(d.entryId, event);
@@ -361,6 +407,24 @@
         block={{ ...drag, id: '__ghost__', lane: 0, lanes: 1 }}
         label="New entry"
         color="var(--no-project)"
+        hour12={store.hour12}
+        dragging
+      />
+    {/if}
+
+    {#if movedHere && movingEntry}
+      <TimeEntryBlock
+        block={{
+          id: movingEntry.id,
+          startMin: drag.startMin,
+          endMin: drag.endMin,
+          lane: 0,
+          lanes: 1,
+        }}
+        label={movingEntry.description}
+        color={entryColor(movingEntry, store.projectsById)}
+        tags={entryTagNames(movingEntry, store.tagsById)}
+        selected={selectedId === movingEntry.id}
         hour12={store.hour12}
         dragging
       />
