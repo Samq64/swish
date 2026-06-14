@@ -94,13 +94,23 @@
     border-radius: var(--radius);
     padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
   }
+  /* The whole pill carries the accent focus indication, so the borderless
+     field inside it stays clean (no inner box or ring from the global rule). */
+  .timer-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
   .desc {
     flex: 1;
     min-width: 0;
     border: none;
     outline: none;
+    padding: 0;
     font-size: 15px;
     background: transparent;
+  }
+  .desc:focus {
+    box-shadow: none;
   }
   .clock {
     font-variant-numeric: tabular-nums;

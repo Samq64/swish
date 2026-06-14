@@ -100,10 +100,6 @@
 <style>
   .search {
     margin: var(--space-2) var(--space-5) var(--space-1);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    font-size: 14px;
   }
   .list {
     padding: var(--space-2) var(--space-5);
@@ -147,10 +143,6 @@
   .name {
     flex: 1;
     min-width: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    font-size: 14px;
   }
   .delete {
     display: inline-flex;

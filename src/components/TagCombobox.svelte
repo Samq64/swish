@@ -75,6 +75,7 @@
               checked={selected.has(t.id)}
               onchange={() => onToggle?.(t.id)}
             />
+            <span class="box" aria-hidden="true"><Icon name="check" size={12} /></span>
             <span>{t.name}</span>
           </label>
         {/each}
@@ -102,10 +103,14 @@
     gap: var(--space-1);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--surface);
-    padding: var(--space-1) var(--space-2);
-    min-height: 30px;
+    background: var(--bg);
+    padding: var(--space-2);
     cursor: pointer;
+  }
+  .trigger:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
   }
   .chips {
     display: flex;
@@ -113,9 +118,12 @@
     gap: var(--space-1);
     flex: 1;
   }
+  /* Chips echo the entry's accent (the popover overrides --accent with the
+     project colour) using the same mix as the timeline block's tags, so the
+     editor reads as belonging to that task. */
   .chip {
-    background: color-mix(in srgb, var(--accent) 15%, var(--surface));
-    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+    color: color-mix(in srgb, var(--accent) 75%, var(--text));
     border-radius: 999px;
     padding: 1px var(--space-2);
     font-size: 12px;
@@ -125,7 +133,7 @@
     flex: 1;
     text-align: left;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 14px;
   }
   .caret {
     display: inline-flex;
@@ -150,10 +158,6 @@
   }
   .search {
     width: 100%;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-2);
-    font-size: 13px;
     margin-bottom: var(--space-1);
   }
   .options {
@@ -172,8 +176,38 @@
   .option:hover {
     background: var(--bg);
   }
+  /* Custom checkbox: the native input is hidden but kept for semantics and
+     focus, while `.box` is the visible control (accent-filled with a check when
+     ticked). The check icon rides on `color`, so it's invisible until checked. */
   .option input {
-    accent-color: var(--accent);
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+  }
+  .box {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: transparent;
+    transition:
+      background 0.12s ease,
+      border-color 0.12s ease;
+  }
+  .option input:checked + .box {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent, #fff);
+  }
+  .option input:focus-visible + .box {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   .create {
     width: 100%;

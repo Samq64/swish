@@ -108,6 +108,7 @@
           class:on={filterProjectIds.has(NO_PROJECT)}
           onclick={() => toggleProject(NO_PROJECT)}
         >
+          <span class="dot" style:background="var(--no-project)"></span>
           No project
         </button>
       </div>

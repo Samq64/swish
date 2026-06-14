@@ -1,6 +1,7 @@
 <script>
   import { startOfDay, clamp } from '../lib/time.js';
-  import { autofocus } from '../lib/actions.js';
+  import { autofocus, clickOutside } from '../lib/actions.js';
+  import Icon from '../lib/Icon.svelte';
   import TagCombobox from './TagCombobox.svelte';
 
   /**
@@ -59,6 +60,26 @@
     coords = { x, y };
   });
 
+  let projectOpen = $state(false);
+  let selectedProject = $derived(
+    entry.projectId ? (projects.find((p) => p.id === entry.projectId) ?? null) : null,
+  );
+  // The whole editor takes on the entry's project colour: we override `--accent`
+  // on the root so every control inside — the description underline, the project
+  // picker, the tag chips, time-input focus and the Done button — themes to it,
+  // since they all reference var(--accent). With no project we fall back to a
+  // theme-aware gray and flip --on-accent (the glyph colour on accent fills) so
+  // a check / button label stays readable on a light-gray accent in dark mode.
+  let accent = $derived(selectedProject?.color ?? 'var(--no-project-accent)');
+  let onAccent = $derived(
+    selectedProject ? null : 'light-dark(#ffffff, #16161c)',
+  );
+
+  function pickProject(id) {
+    onChange?.({ projectId: id });
+    projectOpen = false;
+  }
+
   let assigned = $derived(new Set(entry.tagIds ?? []));
 
   function toggleTag(id) {
@@ -97,6 +118,8 @@
 <div
   class="popover"
   bind:this={el}
+  style:--accent={accent}
+  style:--on-accent={onAccent}
   style:left="{coords?.x ?? 0}px"
   style:top="{coords?.y ?? 0}px"
   style:visibility={coords ? 'visible' : 'hidden'}
@@ -106,27 +129,68 @@
   <input
     class="desc"
     type="text"
-    placeholder="Description"
+    placeholder="Add description"
     value={entry.description}
     oninput={(e) => onChange?.({ description: e.currentTarget.value })}
     use:autofocus={{ select: true }}
   />
 
-  <label class="row">
-    <span>Project</span>
-    <select
-      value={entry.projectId ?? ''}
-      onchange={(e) =>
-        onChange?.({ projectId: e.currentTarget.value || null })}
-    >
-      <option value="">No project</option>
-      {#each projects as p (p.id)}
-        <option value={p.id}>{p.name}</option>
-      {/each}
-    </select>
-  </label>
+  <div class="field">
+    <span class="label">Project</span>
+    <div class="dropdown" use:clickOutside={() => (projectOpen = false)}>
+      <button
+        class="dd-trigger"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={projectOpen}
+        onclick={() => (projectOpen = !projectOpen)}
+      >
+        <span class="dot" style:background={selectedProject?.color ?? 'var(--no-project)'}></span>
+        <span class="dd-name" class:none={!selectedProject}>
+          {selectedProject?.name ?? 'No project'}
+        </span>
+        <span class="caret" class:open={projectOpen}>
+          <Icon name="chevron-down" size={16} />
+        </span>
+      </button>
 
-  <div class="tags-field">
+      {#if projectOpen}
+        <div class="dd-panel" role="listbox">
+          <button
+            class="option"
+            class:current={!entry.projectId}
+            role="option"
+            aria-selected={!entry.projectId}
+            onclick={() => pickProject(null)}
+          >
+            <span class="check">
+              {#if !entry.projectId}<Icon name="check" size={14} />{/if}
+            </span>
+            <span class="dot" style:background="var(--no-project)"></span>
+            <span class="opt-name none">No project</span>
+          </button>
+          {#each projects as p (p.id)}
+            {@const isCurrent = p.id === entry.projectId}
+            <button
+              class="option"
+              class:current={isCurrent}
+              role="option"
+              aria-selected={isCurrent}
+              onclick={() => pickProject(p.id)}
+            >
+              <span class="check">
+                {#if isCurrent}<Icon name="check" size={14} />{/if}
+              </span>
+              <span class="dot" style:background={p.color}></span>
+              <span class="opt-name">{p.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <div class="field">
     <span class="label">Tags</span>
     <TagCombobox
       {tags}
@@ -188,50 +252,141 @@
       width: 200px;
     }
   }
+  /* Underline-only field: opt out of the global boxed input look (no box, no
+     fill, no focus ring) and keep the clean bottom rule. */
   .desc {
     width: 100%;
     border: none;
     border-bottom: 2px solid var(--border);
+    border-radius: 0;
     padding: var(--space-1) 0;
     font-size: 14px;
     font-weight: 600;
+    background: transparent;
     outline: none;
   }
   .desc:focus {
     border-color: var(--accent);
+    box-shadow: none;
   }
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .row select {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-2);
-    background: var(--surface);
-  }
-  .tags-field {
+  .field {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
-  .tags-field .label {
+  .field .label {
     font-size: 13px;
     color: var(--muted);
+  }
+
+  /* Custom project picker — mirrors the workspace switcher's trigger + panel
+     look rather than the native <select>, so the menu can show project colours
+     and a check on the current choice. */
+  .dropdown {
+    position: relative;
+  }
+  .dd-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-2);
+    font-size: 14px;
+    color: var(--text);
+    text-align: left;
+  }
+  .dd-trigger:hover {
+    border-color: var(--accent);
+  }
+  .dd-trigger[aria-expanded='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .dd-name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dd-name.none {
+    color: var(--muted);
+  }
+  .caret {
+    display: inline-flex;
+    flex: none;
+    color: var(--muted);
+    transition: transform 0.12s ease;
+  }
+  .caret.open {
+    transform: rotate(180deg);
+  }
+
+  .dd-panel {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    left: 0;
+    right: 0;
+    z-index: 60;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    padding: var(--space-1);
+  }
+  .option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    font: inherit;
+    color: inherit;
+  }
+  .option:hover {
+    background: var(--bg);
+  }
+  .option.current {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+  .opt-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .opt-name.none {
+    color: var(--muted);
+  }
+  .check {
+    width: 14px;
+    flex: none;
+    display: inline-flex;
+    justify-content: center;
+    color: var(--accent);
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 50%;
   }
   .times {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     font-size: 13px;
-  }
-  .times input {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-2);
   }
   .actions {
     display: flex;
@@ -255,7 +410,7 @@
   }
   .done {
     background: var(--accent);
-    color: white;
+    color: var(--on-accent);
     border: none;
     border-radius: var(--radius);
     padding: var(--space-2) var(--space-4);

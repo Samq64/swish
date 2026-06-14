@@ -122,16 +122,6 @@
     flex: 1;
     min-width: 0;
     height: 36px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0 var(--space-2);
-    font-size: 14px;
-    background: var(--bg);
-    color: var(--text);
-  }
-  .name:focus {
-    outline: none;
-    border-color: var(--accent);
   }
   .icon-btn {
     flex: none;

@@ -11,7 +11,14 @@
   --text: light-dark(#2d2d3a, #e7e7ef);
   --muted: light-dark(#8a8a9a, #9595a4);
   --accent: light-dark(#6c5ce7, #8b7cf0);
+  /* Foreground (text/icons) that sits on top of a --accent fill. White suits
+     the saturated project/brand accents; the no-project gray below flips it. */
+  --on-accent: #ffffff;
   --no-project: light-dark(#9ca3af, #6b7280);
+  /* The editor's accent when an entry has no project: a gray that contrasts
+     with the surface in each theme (dark on light, light on dark), unlike the
+     mid --no-project dot. Pair with --on-accent light-dark(#fff, #16161c). */
+  --no-project-accent: light-dark(#6b7280, #9ca3af);
   --grid-line: light-dark(#ededf3, #2a2a33);
   --grid-line-strong: light-dark(#e0e0ea, #3a3a46);
 
@@ -54,10 +61,30 @@ button {
   cursor: pointer;
 }
 
-input,
-select {
-  font: inherit;
-  color: inherit;
+/* Inputs share one look app-wide (the Settings panel's boxed style). The
+   underline-only fields (e.g. the entry editor description) opt out via their
+   own component styles; checkbox/colour/file inputs keep native rendering.
+   `:where()` keeps this at element-level specificity so components can still
+   override layout (margins, flex, width) without fighting it. */
+input:where(:not([type='checkbox'], [type='color'], [type='file'])),
+select,
+textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+}
+input:where(:not([type='checkbox'], [type='color'], [type='file'])):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  /* Reads as a slightly thicker accent border, without the 1px reflow that
+     bumping border-width would cause. */
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 /* Tighter gutters on small screens — shrinks every --space-5 container pad. */

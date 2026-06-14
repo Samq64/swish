@@ -228,18 +228,6 @@
     font-size: 13px;
     color: var(--muted);
   }
-  input {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    font-size: 14px;
-    background: var(--bg);
-    color: var(--text);
-  }
-  input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
   .btn {
     align-self: flex-start;
     display: inline-flex;

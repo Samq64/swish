@@ -84,18 +84,6 @@
     font-size: 13px;
     color: var(--muted);
   }
-  input {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    font-size: 15px;
-    background: var(--bg);
-    color: var(--text);
-  }
-  input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
   .error {
     margin: 0;
     color: #d63031;
