@@ -10,6 +10,9 @@ import { json, error, readJson, sameOrigin } from '$lib/server/http.js';
 import { isIso, isStr, isStrArray, isHexColor } from '$lib/server/validate.js';
 import { hashPassword, verifyPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
 import { clearSessionCookie } from '$lib/server/session.js';
+import { listWorkspaces, listProjects, listTags } from '$lib/server/data.js';
+
+const LIST_SCOPED = { projects: listProjects, tags: listTags };
 
 const DEFAULT_COLOR = '#6c5ce7';
 const NAME_MAX = 200;
@@ -302,12 +305,7 @@ async function handleScoped(ctx, table, rest, method, user) {
     if (method === 'GET') {
       const workspaceId = new URL(request.url).searchParams.get('workspaceId');
       if (!(await ownsWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
-      const { results } = await env.DB.prepare(
-        `SELECT * FROM ${table} WHERE workspace_id = ? ORDER BY name COLLATE NOCASE`,
-      )
-        .bind(workspaceId)
-        .all();
-      return json(results.map(cfg.map));
+      return json(await LIST_SCOPED[table](env, workspaceId));
     }
     if (method === 'POST') {
       const body = (await readJson(request)) || {};
@@ -380,12 +378,7 @@ async function handleWorkspaces(ctx, rest, method, user) {
 
   if (rest.length === 0) {
     if (method === 'GET') {
-      const { results } = await env.DB.prepare(
-        'SELECT id, name FROM workspaces WHERE user_id = ? ORDER BY name COLLATE NOCASE',
-      )
-        .bind(user.id)
-        .all();
-      return json(results.map((w) => ({ id: w.id, name: w.name })));
+      return json(await listWorkspaces(env, user.id));
     }
     if (method === 'POST') {
       const body = (await readJson(request)) || {};

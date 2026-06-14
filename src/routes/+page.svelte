@@ -13,7 +13,8 @@
   import SettingsModal from '../components/SettingsModal.svelte';
   import WorkspacesModal from '../components/WorkspacesModal.svelte';
 
-  store.bootstrap();
+  let { data } = $props();
+  store.hydrate(data);
 
   let showProjects = $state(false);
   let showTags = $state(false);

@@ -75,26 +75,19 @@ export class AppStore {
   // --- auth & bootstrap ------------------------------------------------------
 
   /**
-   * Load the signed-in user's data on startup. Access to the app is already
-   * gated by the server middleware (which redirects to /login when there is no
-   * session), and the repository bounces any runtime 401 to /login too.
+   * Seed the store from the server `load` (see routes/+page.server.js): user,
+   * workspaces and the active workspace's projects/tags arrive with the page,
+   * so there's no client-side bootstrap waterfall. Entries depend on the local
+   * date range, which the server can't know, so they're fetched here.
    */
-  async bootstrap() {
-    try {
-      const me = await this.#repo.me();
-      this.currentUser = { username: me.username };
-      const workspaces = await this.#repo.listWorkspaces();
-      this.workspaces = AppStore.#sortByName(workspaces);
-      this.currentWorkspaceId =
-        workspaces.find((w) => w.id === me.activeWorkspaceId)?.id ??
-        workspaces[0]?.id ??
-        null;
-      await this.loadWorkspaceData();
-    } catch (e) {
-      if (e?.status !== 401) console.error(e);
-    } finally {
-      this.ready = true;
-    }
+  hydrate({ username, workspaces, activeWorkspaceId, projects, tags }) {
+    this.currentUser = { username };
+    this.workspaces = AppStore.#sortByName(workspaces);
+    this.currentWorkspaceId = activeWorkspaceId ?? workspaces[0]?.id ?? null;
+    this.projects = AppStore.#sortByName(projects);
+    this.tags = AppStore.#sortByName(tags);
+    this.ready = true;
+    return this.loadRange();
   }
 
   /** Sign out of this device (server clears the session and redirects). */
