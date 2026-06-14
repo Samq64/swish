@@ -15,7 +15,7 @@ export async function resolveUser(env, token) {
   if (!token) return null;
   const id = await sha256b64url(token);
   const row = await env.DB.prepare(
-    `SELECT s.user_id, s.expires_at, u.username, u.active_workspace_id
+    `SELECT s.user_id, s.expires_at, u.username, u.active_workspace_id, u.theme, u.week_start
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ?`,
   )
@@ -30,6 +30,8 @@ export async function resolveUser(env, token) {
     id: row.user_id,
     username: row.username,
     activeWorkspaceId: row.active_workspace_id,
+    theme: row.theme,
+    weekStart: row.week_start,
   };
 }
 

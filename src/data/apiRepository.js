@@ -86,6 +86,7 @@ export function createApiRepository() {
 
     // --- settings ---
     setActiveWorkspaceId: (id) => put('/settings/active-workspace', { workspaceId: id }),
+    setPreferences: (prefs) => put('/settings/preferences', prefs),
 
     // --- export / import ---
     exportWorkspace: (workspaceId) => get(`/workspaces/${workspaceId}/export`),

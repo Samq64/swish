@@ -29,10 +29,13 @@
   color: var(--text);
 }
 
-/* Dark theme — follows the OS preference. Only the colour tokens change; the
-   spacing/radius scale and all component CSS reference these. */
+/* Dark theme — only the colour tokens change; the spacing/radius scale and all
+   component CSS reference these. It applies in two cases: when the OS prefers
+   dark and the user hasn't forced a theme (the media query), and when the user
+   explicitly picks dark (the [data-theme] rule). The block is repeated because
+   CSS can't share declarations across an @media boundary. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #16161c;
     --surface: #1f1f29;
     --border: #34343f;
@@ -43,6 +46,24 @@
     --grid-line: #2a2a33;
     --grid-line-strong: #3a3a46;
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #16161c;
+  --surface: #1f1f29;
+  --border: #34343f;
+  --text: #e7e7ef;
+  --muted: #9595a4;
+  --accent: #8b7cf0;
+  --no-project: #6b7280;
+  --grid-line: #2a2a33;
+  --grid-line-strong: #3a3a46;
+}
+
+/* Forced light: keep the default tokens but stop native controls going dark. */
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 * {

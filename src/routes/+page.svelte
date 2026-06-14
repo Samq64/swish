@@ -16,6 +16,14 @@
   let { data } = $props();
   store.hydrate(data);
 
+  // Reflect the user's theme onto <html>; 'auto' drops the attribute so app.css
+  // falls back to the OS preference.
+  $effect(() => {
+    const el = document.documentElement;
+    if (store.theme === 'auto') el.removeAttribute('data-theme');
+    else el.setAttribute('data-theme', store.theme);
+  });
+
   let showProjects = $state(false);
   let showTags = $state(false);
   let showSettings = $state(false);

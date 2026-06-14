@@ -88,6 +88,31 @@
 
     <div class="body">
       <section class="section">
+        <h3>Preferences</h3>
+        <div class="pref-row">
+          <span class="pref-label">Theme</span>
+          <div class="seg" role="group" aria-label="Theme">
+            {#each ['auto', 'light', 'dark'] as t (t)}
+              <button class:active={store.theme === t} onclick={() => store.setTheme(t)}>
+                {t}
+              </button>
+            {/each}
+          </div>
+        </div>
+        <div class="pref-row">
+          <span class="pref-label">Week starts</span>
+          <div class="seg" role="group" aria-label="Week start">
+            <button class:active={store.weekStart === 0} onclick={() => store.setWeekStart(0)}>
+              Sunday
+            </button>
+            <button class:active={store.weekStart === 1} onclick={() => store.setWeekStart(1)}>
+              Monday
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
         <h3>Account</h3>
         <p class="account-line">
           Signed in as <strong>{store.currentUser?.username}</strong>
@@ -209,6 +234,38 @@
     margin: 0;
     font-size: 14px;
     color: var(--muted);
+  }
+  .pref-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .pref-label {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .seg button {
+    border: none;
+    background: var(--surface);
+    color: var(--muted);
+    padding: var(--space-1) var(--space-3);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .seg button + button {
+    border-left: 1px solid var(--border);
+  }
+  .seg button.active {
+    background: var(--accent);
+    color: #fff;
   }
   .hint {
     margin: 0;

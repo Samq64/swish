@@ -3,7 +3,13 @@
 declare global {
   namespace App {
     interface Locals {
-      user: { id: string; username: string; activeWorkspaceId: string | null } | null;
+      user: {
+        id: string;
+        username: string;
+        activeWorkspaceId: string | null;
+        theme: 'auto' | 'light' | 'dark';
+        weekStart: 0 | 1;
+      } | null;
     }
     interface Platform {
       env: {

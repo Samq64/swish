@@ -518,6 +518,26 @@ async function handleSettings(ctx, rest, method, user) {
       .run();
     return json({ ok: true });
   }
+
+  if (rest[0] === 'preferences') {
+    const body = (await readJson(request)) || {};
+    const sets = [];
+    const vals = [];
+    if ('theme' in body) {
+      if (!['auto', 'light', 'dark'].includes(body.theme)) return error(400, 'Invalid theme');
+      sets.push('theme = ?'), vals.push(body.theme);
+    }
+    if ('weekStart' in body) {
+      if (body.weekStart !== 0 && body.weekStart !== 1) return error(400, 'Invalid weekStart');
+      sets.push('week_start = ?'), vals.push(body.weekStart);
+    }
+    if (sets.length) {
+      await env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
+        .bind(...vals, user.id)
+        .run();
+    }
+    return json({ ok: true });
+  }
   return error(404, 'Not found');
 }
 
@@ -529,7 +549,12 @@ async function handleAuth(ctx, rest, method, user) {
 
   if (action === 'me' && method === 'GET') {
     if (!user) return error(401, 'Not authenticated');
-    return json({ username: user.username, activeWorkspaceId: user.activeWorkspaceId });
+    return json({
+      username: user.username,
+      activeWorkspaceId: user.activeWorkspaceId,
+      theme: user.theme,
+      weekStart: user.weekStart,
+    });
   }
 
   // Sign in / sign up / sign out are routes (/login, /register, /logout). The

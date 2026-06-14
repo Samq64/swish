@@ -1,7 +1,5 @@
 import { startOfDay, startOfWeek, addDays } from '../lib/time.js';
 
-export const WEEK_STARTS_ON = 0; // Sunday
-
 /**
  * Reactive application state, built on Svelte 5 runes. It is the only thing
  * the UI talks to for data, and it in turn only talks to a {@link Repository}.
@@ -25,6 +23,10 @@ export class AppStore {
   currentUser = $state(null);
   /** False until the initial session check resolves (avoids a login flash). */
   ready = $state(false);
+  /** Colour theme preference: 'auto' (follow OS) | 'light' | 'dark'. */
+  theme = $state('auto');
+  /** Day the week starts on: 0 = Sunday, 1 = Monday. */
+  weekStart = $state(0);
   /** 'week' | 'day' | 'list' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
@@ -42,7 +44,7 @@ export class AppStore {
     if (this.view === 'day') {
       return [startOfDay(this.anchor).toISOString()];
     }
-    const start = startOfWeek(this.anchor, WEEK_STARTS_ON);
+    const start = startOfWeek(this.anchor, this.weekStart);
     return Array.from({ length: 7 }, (_, i) => addDays(start, i).toISOString());
   });
 
@@ -80,14 +82,42 @@ export class AppStore {
    * so there's no client-side bootstrap waterfall. Entries depend on the local
    * date range, which the server can't know, so they're fetched here.
    */
-  hydrate({ username, workspaces, activeWorkspaceId, projects, tags }) {
+  hydrate({ username, theme, weekStart, workspaces, activeWorkspaceId, projects, tags }) {
     this.currentUser = { username };
+    this.theme = theme ?? 'auto';
+    this.weekStart = weekStart ?? 0;
     this.workspaces = AppStore.#sortByName(workspaces);
     this.currentWorkspaceId = activeWorkspaceId ?? workspaces[0]?.id ?? null;
     this.projects = AppStore.#sortByName(projects);
     this.tags = AppStore.#sortByName(tags);
     this.ready = true;
     return this.loadRange();
+  }
+
+  /** Set the colour theme (persisted per-user; reverts on failure). */
+  async setTheme(theme) {
+    const prev = this.theme;
+    this.theme = theme;
+    try {
+      await this.#repo.setPreferences({ theme });
+    } catch (e) {
+      this.theme = prev;
+      throw e;
+    }
+  }
+
+  /** Set the first day of the week; reloads the visible range it shifts. */
+  async setWeekStart(weekStart) {
+    if (weekStart === this.weekStart) return;
+    const prev = this.weekStart;
+    this.weekStart = weekStart;
+    try {
+      await this.#repo.setPreferences({ weekStart });
+      await this.loadRange();
+    } catch (e) {
+      this.weekStart = prev;
+      throw e;
+    }
   }
 
   /** Sign out of this device (server clears the session and redirects). */

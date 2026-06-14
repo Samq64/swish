@@ -22,5 +22,13 @@ export async function load({ locals, platform }) {
     ? await Promise.all([listProjects(env, activeWorkspaceId), listTags(env, activeWorkspaceId)])
     : [[], []];
 
-  return { username: user.username, workspaces, activeWorkspaceId, projects, tags };
+  return {
+    username: user.username,
+    theme: user.theme,
+    weekStart: user.weekStart,
+    workspaces,
+    activeWorkspaceId,
+    projects,
+    tags,
+  };
 }

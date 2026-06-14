@@ -265,6 +265,28 @@ test('a second user cannot read or write the first user’s data', async () => {
   assert.equal(write.status, 403);
 });
 
+test('preferences default to auto/Sunday and can be updated', async () => {
+  const me0 = await api('GET', '/api/auth/me', { cookie: alice });
+  assert.equal(me0.json.theme, 'auto');
+  assert.equal(me0.json.weekStart, 0);
+
+  const bad = await api('PUT', '/api/settings/preferences', {
+    cookie: alice,
+    body: { theme: 'neon' },
+  });
+  assert.equal(bad.status, 400);
+
+  const ok = await api('PUT', '/api/settings/preferences', {
+    cookie: alice,
+    body: { theme: 'dark', weekStart: 1 },
+  });
+  assert.equal(ok.status, 200);
+
+  const me1 = await api('GET', '/api/auth/me', { cookie: alice });
+  assert.equal(me1.json.theme, 'dark');
+  assert.equal(me1.json.weekStart, 1);
+});
+
 test('login rejects a wrong password and accepts the right one', async () => {
   const bad = await form('/login', { username: 'alice', password: 'wrong-password' });
   assert.equal(bad.status, 401);

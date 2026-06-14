@@ -4,6 +4,10 @@
   import Icon from '../lib/Icon.svelte';
 
   let description = $state('');
+  let descInput;
+  // A timer needs a description before it can start; manual drag-created entries
+  // (on the timeline) don't, by design.
+  let canStart = $derived(!!running || description.trim() !== '');
 
   // Tick once a second so the running clock updates.
   let now = $state(Date.now());
@@ -41,8 +45,13 @@
       await store.stop(running.id);
       description = '';
     } else {
+      const desc = description.trim();
+      if (!desc) {
+        descInput?.focus();
+        return;
+      }
       await store.create({
-        description,
+        description: desc,
         projectId: null,
         start: new Date().toISOString(),
         end: null,
@@ -62,11 +71,12 @@
     class="desc"
     type="text"
     placeholder="What are you working on?"
+    bind:this={descInput}
     bind:value={description}
     oninput={() => running && store.update(running.id, { description })}
   />
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
-  <button class="toggle" class:running type="submit">
+  <button class="toggle" class:running type="submit" disabled={!canStart}>
     <Icon name={running ? 'square' : 'play'} size={15} />
     {running ? 'Stop' : 'Start'}
   </button>
@@ -114,5 +124,9 @@
   }
   .toggle.running {
     background: #e74c3c;
+  }
+  .toggle:disabled {
+    opacity: 0.55;
+    cursor: default;
   }
 </style>
