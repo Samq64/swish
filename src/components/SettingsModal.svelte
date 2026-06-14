@@ -110,6 +110,17 @@
             </button>
           </div>
         </div>
+        <div class="pref-row">
+          <span class="pref-label">Clock</span>
+          <div class="seg" role="group" aria-label="Clock format">
+            <button class:active={store.hour12} onclick={() => store.setHour12(true)}>
+              12-hour
+            </button>
+            <button class:active={!store.hour12} onclick={() => store.setHour12(false)}>
+              24-hour
+            </button>
+          </div>
+        </div>
       </section>
 
       <section class="section">

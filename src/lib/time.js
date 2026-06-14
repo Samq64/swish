@@ -94,11 +94,14 @@ export function formatDuration(minutes) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/** "9:00 AM" style clock label for minutes-from-midnight. */
-export function formatClock(minutes) {
+/** Clock label for minutes-from-midnight: "9:00 AM" (hour12) or "09:00". */
+export function formatClock(minutes, hour12 = true) {
   const m = ((minutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   let h = Math.floor(m / 60);
   const min = Math.round(m % 60);
+  if (!hour12) {
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
   const ampm = h < 12 ? 'AM' : 'PM';
   h = h % 12 || 12;
   return `${h}:${String(min).padStart(2, '0')} ${ampm}`;

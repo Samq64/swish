@@ -14,6 +14,7 @@
     selected = false,
     dragging = false,
     running = false,
+    hour12 = true,
     onGrab,
   } = $props();
 
@@ -78,7 +79,7 @@
         <span class="elapsed">{elapsedLabel}</span>
       {:else}
         <span class="range">
-          {formatClock(block.startMin)} – {formatClock(block.endMin)}
+          {formatClock(block.startMin, hour12)} – {formatClock(block.endMin, hour12)}
         </span>
       {/if}
     {/if}

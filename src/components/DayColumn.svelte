@@ -351,6 +351,7 @@
         tags={entryTagNames(entry, store.tagsById)}
         selected={selectedId === b.id}
         dragging={drag?.entryId === b.id}
+        hour12={store.hour12}
         onGrab={(mode, event) => beginEntryDrag(entry, mode, event)}
       />
     {/each}
@@ -360,6 +361,7 @@
         block={{ ...drag, id: '__ghost__', lane: 0, lanes: 1 }}
         label="New entry"
         color="var(--no-project)"
+        hour12={store.hour12}
         dragging
       />
     {/if}

@@ -27,6 +27,8 @@ export class AppStore {
   theme = $state('auto');
   /** Day the week starts on: 0 = Sunday, 1 = Monday. */
   weekStart = $state(0);
+  /** Clock format: true = 12-hour (AM/PM), false = 24-hour. */
+  hour12 = $state(true);
   /** 'week' | 'day' | 'list' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
@@ -82,10 +84,11 @@ export class AppStore {
    * so there's no client-side bootstrap waterfall. Entries depend on the local
    * date range, which the server can't know, so they're fetched here.
    */
-  hydrate({ username, theme, weekStart, workspaces, activeWorkspaceId, projects, tags }) {
+  hydrate({ username, theme, weekStart, hour12, workspaces, activeWorkspaceId, projects, tags }) {
     this.currentUser = { username };
     this.theme = theme ?? 'auto';
     this.weekStart = weekStart ?? 0;
+    this.hour12 = hour12 ?? true;
     this.workspaces = AppStore.#sortByName(workspaces);
     this.currentWorkspaceId = activeWorkspaceId ?? workspaces[0]?.id ?? null;
     this.projects = AppStore.#sortByName(projects);
@@ -116,6 +119,19 @@ export class AppStore {
       await this.loadRange();
     } catch (e) {
       this.weekStart = prev;
+      throw e;
+    }
+  }
+
+  /** Choose 12- or 24-hour clock labels (persisted per-user; reverts on failure). */
+  async setHour12(hour12) {
+    if (hour12 === this.hour12) return;
+    const prev = this.hour12;
+    this.hour12 = hour12;
+    try {
+      await this.#repo.setPreferences({ hour12 });
+    } catch (e) {
+      this.hour12 = prev;
       throw e;
     }
   }

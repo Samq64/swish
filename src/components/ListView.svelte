@@ -168,8 +168,9 @@
             {/if}
 
             <span class="range">
-              {formatClock(dateToMinutes(e.start))} – {formatClock(
+              {formatClock(dateToMinutes(e.start), store.hour12)} – {formatClock(
                 dateToMinutes(e.end),
+                store.hour12,
               )}
             </span>
             <span class="dur">{formatDuration(entryDurationMin(e))}</span>

@@ -37,6 +37,7 @@
  * @property {string|null} activeWorkspaceId
  * @property {'auto'|'light'|'dark'} theme
  * @property {0|1} weekStart  0 = Sunday, 1 = Monday
+ * @property {boolean} hour12  true = 12-hour clock, false = 24-hour
  *
  * @typedef {Object} Repository
  * // auth
@@ -64,7 +65,7 @@
  * @property {(id: string, patch: Partial<Workspace>) => Promise<Workspace>} updateWorkspace
  * @property {(id: string) => Promise<void>} deleteWorkspace
  * @property {(id: string) => Promise<void>} setActiveWorkspaceId
- * @property {(prefs: {theme?: 'auto'|'light'|'dark', weekStart?: 0|1}) => Promise<void>} setPreferences
+ * @property {(prefs: {theme?: 'auto'|'light'|'dark', weekStart?: 0|1, hour12?: boolean}) => Promise<void>} setPreferences
  * @property {(workspaceId: string) => Promise<WorkspaceExport>} exportWorkspace
  * @property {(payload: WorkspaceExport) => Promise<Workspace>} importWorkspace
  *

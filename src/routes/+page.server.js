@@ -26,6 +26,7 @@ export async function load({ locals, platform }) {
     username: user.username,
     theme: user.theme,
     weekStart: user.weekStart,
+    hour12: user.hour12,
     workspaces,
     activeWorkspaceId,
     projects,

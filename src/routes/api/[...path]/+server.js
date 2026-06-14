@@ -531,6 +531,10 @@ async function handleSettings(ctx, rest, method, user) {
       if (body.weekStart !== 0 && body.weekStart !== 1) return error(400, 'Invalid weekStart');
       sets.push('week_start = ?'), vals.push(body.weekStart);
     }
+    if ('hour12' in body) {
+      if (typeof body.hour12 !== 'boolean') return error(400, 'Invalid hour12');
+      sets.push('hour12 = ?'), vals.push(body.hour12 ? 1 : 0);
+    }
     if (sets.length) {
       await env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
         .bind(...vals, user.id)
@@ -554,6 +558,7 @@ async function handleAuth(ctx, rest, method, user) {
       activeWorkspaceId: user.activeWorkspaceId,
       theme: user.theme,
       weekStart: user.weekStart,
+      hour12: user.hour12,
     });
   }
 

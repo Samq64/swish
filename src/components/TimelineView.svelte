@@ -27,6 +27,7 @@
   const hours = Array.from({ length: 24 }, (_, h) => h);
 
   function hourLabel(h) {
+    if (!store.hour12) return String(h).padStart(2, '0');
     if (h === 0) return '12 AM';
     if (h === 12) return '12 PM';
     return h < 12 ? `${h} AM` : `${h - 12} PM`;
