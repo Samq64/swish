@@ -201,11 +201,13 @@
   }
   .seg {
     display: inline-flex;
+    width: 220px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
   }
   .seg button {
+    flex: 1;
     border: none;
     background: var(--surface);
     color: var(--muted);

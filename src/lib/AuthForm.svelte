@@ -71,9 +71,11 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
   }
   .subtitle {
-    margin: 0 0 4px;
-    color: var(--muted);
-    font-size: 14px;
+    margin: 0 0 var(--space-1);
+    color: var(--text);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
   label {
     display: flex;
