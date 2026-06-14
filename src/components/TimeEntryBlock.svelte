@@ -43,6 +43,7 @@
 
 <div
   class="entry"
+  data-entry-id={block.id}
   class:selected
   class:dragging
   class:running

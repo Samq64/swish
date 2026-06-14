@@ -13,7 +13,10 @@
    */
 
   let selectedId = $state(null);
-  let editorPos = $state({ x: 0, y: 0 });
+  // The selected entry's live on-screen rect (editor anchors to it) and the
+  // safe region the editor may occupy (viewport minus the sticky header).
+  let anchor = $state(null);
+  let bounds = $state(null);
 
   let selectedEntry = $derived(
     selectedId
@@ -39,23 +42,70 @@
     return startOfDay(iso).getTime() === startOfDay(new Date()).getTime();
   }
 
-  // Scroll to show current time when the view first mounts.
+  // On first mount, scroll vertically to "now" and — when the week overflows
+  // horizontally (narrow screens) — bring today's column into view so it isn't
+  // hidden off to the right.
   $effect(() => {
     if (!scrollEl) return;
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
     const nowPx = minutesToPx(minutes);
     scrollEl.scrollTop = Math.max(0, nowPx - scrollEl.clientHeight / 3);
+
+    const todayEl = scrollEl.querySelector('.day-head.today');
+    if (todayEl) {
+      const wrap = scrollEl.getBoundingClientRect();
+      const el = todayEl.getBoundingClientRect();
+      const target =
+        scrollEl.scrollLeft + (el.left - wrap.left) - (scrollEl.clientWidth - el.width) / 2;
+      scrollEl.scrollLeft = clamp(target, 0, scrollEl.scrollWidth - scrollEl.clientWidth);
+    }
   });
 
-  function handleSelect(id, event) {
+  function handleSelect(id) {
     selectedId = id;
-    if (!id) return;
-    const margin = 12;
-    const x = clamp((event?.clientX ?? 200) + margin, 8, window.innerWidth - 260);
-    const y = clamp((event?.clientY ?? 120) - 20, 8, window.innerHeight - 260);
-    editorPos = { x, y };
   }
+
+  // Keep `anchor` glued to the selected entry's block while it's open, so the
+  // editor follows live drags/resizes and stays put during scrolls. `bounds` is
+  // the safe region the editor may occupy: the scroll viewport minus the sticky
+  // day-header, so a scrolled-away entry can't drag the popover over the header.
+  // One cheap measure per frame; we only publish when something actually moves.
+  $effect(() => {
+    const id = selectedId;
+    if (!id || !scrollEl) {
+      anchor = null;
+      bounds = null;
+      return;
+    }
+    let raf;
+    const tick = () => {
+      const el = scrollEl.querySelector(`[data-entry-id="${id}"]`);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (
+          !anchor ||
+          anchor.left !== r.left ||
+          anchor.top !== r.top ||
+          anchor.width !== r.width ||
+          anchor.height !== r.height
+        ) {
+          anchor = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+        }
+      }
+
+      const sr = scrollEl.getBoundingClientRect();
+      const head = scrollEl.querySelector('.header-row');
+      const top = head ? head.getBoundingClientRect().bottom : sr.top;
+      if (!bounds || bounds.top !== top || bounds.bottom !== sr.bottom) {
+        bounds = { top, bottom: sr.bottom };
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  });
 </script>
 
 <div class="view">
@@ -101,7 +151,8 @@
     entry={selectedEntry}
     projects={store.projects}
     tags={store.tags}
-    pos={editorPos}
+    {anchor}
+    {bounds}
     running={selectedEntry.end === null}
     onCreateTag={(name) => store.addTag({ name })}
     onChange={(patch) => store.update(selectedEntry.id, patch)}
@@ -170,6 +221,11 @@
   .scroll {
     flex: 1;
     overflow-y: auto;
+    /* A drag-to-create that begins at scrollTop 0 would otherwise overscroll
+       into Android's pull-to-refresh, which steals the pointer mid-gesture.
+       Containing the overscroll keeps the drag ours; normal scrolling is
+       unaffected. */
+    overscroll-behavior-y: contain;
   }
   .body {
     display: flex;

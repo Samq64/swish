@@ -18,9 +18,13 @@
   /**
    * One day of the timeline. Owns every pointer gesture for its own day:
    *
-   *   • drag on empty space   -> create a new entry
-   *   • drag an entry's edges -> resize (extend / shrink) it
-   *   • drag an entry's body  -> move it (within the day)
+   *   • drag empty space (mouse) -> create a sized entry in one gesture
+   *   • hold empty space (touch) -> drop a default-length entry to resize later
+   *   • drag an entry's edges    -> resize (extend / shrink) it
+   *   • drag an entry's body     -> move it (within the day)
+   *
+   * Touch splits creating and resizing into two actions (a finicky drag-to-size
+   * is hard with a finger); a mouse keeps the precise combined drag.
    *
    * Selection is bubbled up via `onSelect` so a single editor can be shared
    * across all columns in the week.
@@ -109,7 +113,8 @@
     pressStart = null;
   }
 
-  // Drop a fresh create gesture anchored at `anchorMin`, sized to `endMin`.
+  // Mouse only: drop a fresh create-drag anchored at `anchorMin` so the pointer
+  // can size it before release.
   function startCreate(event, anchorMin, endMin = anchorMin) {
     drag = {
       mode: 'create',
@@ -124,10 +129,29 @@
     gridEl.setPointerCapture?.(event.pointerId);
   }
 
+  // Touch only: a hold drops a default-length entry at `clientY` and opens it,
+  // with no sizing drag. The editor anchors itself to the new block.
+  async function createDefaultEntry(clientY) {
+    if (!gridEl) return;
+    const m = clamp(
+      pxToMinutes(clientY - gridEl.getBoundingClientRect().top),
+      0,
+      MINUTES_PER_DAY,
+    );
+    const start = clamp(snap(m), 0, MINUTES_PER_DAY - DEFAULT_CREATE_MIN);
+    const entry = await store.create({
+      description: '',
+      projectId: null,
+      start: minutesToISO(dayISO, start),
+      end: minutesToISO(dayISO, start + DEFAULT_CREATE_MIN),
+    });
+    onSelect?.(entry.id);
+  }
+
   function beginCreate(event) {
     if (event.button != null && event.button !== 0) return;
     if (event.pointerType === 'touch') {
-      // Wait for a hold before grabbing; a finger-move first = scroll.
+      // Hold to create; a finger-move first = scroll, a quick tap = dismiss.
       cancelLongPress();
       pressStart = {
         pointerId: event.pointerId,
@@ -136,25 +160,31 @@
       };
       pressTimer = setTimeout(() => {
         pressTimer = null;
-        if (!gridEl || !pressStart) return;
-        const m = clamp(
-          pxToMinutes(pressStart.clientY - gridEl.getBoundingClientRect().top),
-          0,
-          MINUTES_PER_DAY,
-        );
-        const start = clamp(snap(m), 0, MINUTES_PER_DAY - DEFAULT_CREATE_MIN);
-        startCreate({ pointerId: pressStart.pointerId }, start, start + DEFAULT_CREATE_MIN);
-        navigator.vibrate?.(10);
+        const p = pressStart;
         pressStart = null;
+        if (!p) return;
+        navigator.vibrate?.(10);
+        createDefaultEntry(p.clientY);
       }, LONG_PRESS_MS);
       return;
     }
+    // Mouse / pen: keep the precise combined drag-to-size.
     startCreate(event, snap(pointerMinutes(event)));
   }
 
   // Block the page from scrolling once a drag is live (touch).
   function onTouchMove(event) {
     if (drag) event.preventDefault();
+  }
+
+  // A cancel is an interrupted gesture, not a finished one — drop it without
+  // creating anything (otherwise an OS pointer-steal commits a phantom entry).
+  function onPointerCancel(event) {
+    cancelLongPress();
+    if (!drag) return;
+    drag = null;
+    frozenLanes = null;
+    gridEl.releasePointerCapture?.(event.pointerId);
   }
 
   function beginEntryDrag(entry, mode, event) {
@@ -228,13 +258,21 @@
   // --- commit ----------------------------------------------------------------
 
   async function onPointerUp(event) {
+    // A touch released before the hold fired is a plain tap — dismiss any
+    // selection (the long-press path already handled real creates).
+    const wasPendingTap = !drag && !!pressStart;
     cancelLongPress();
-    if (!drag) return;
+    if (!drag) {
+      if (wasPendingTap) onSelect?.(null, event);
+      return;
+    }
     const d = drag;
     drag = null;
     frozenLanes = null;
     gridEl.releasePointerCapture?.(event.pointerId);
 
+    // Mouse-only combined create-drag: commit if it was dragged out to a real
+    // span, otherwise treat the click as clearing the selection.
     if (d.mode === 'create') {
       if (d.endMin - d.startMin >= MIN_DURATION) {
         const entry = await store.create({
@@ -243,15 +281,8 @@
           start: minutesToISO(dayISO, d.startMin),
           end: minutesToISO(dayISO, d.endMin),
         });
-        // On touch, wait one frame so the gesture is fully settled before the
-        // popup appears (avoids the popup fighting the finger-up animation).
-        if (event.pointerType === 'touch') {
-          requestAnimationFrame(() => onSelect?.(entry.id, event));
-        } else {
-          onSelect?.(entry.id, event);
-        }
+        onSelect?.(entry.id, event);
       } else {
-        // A plain click on empty space clears the selection.
         onSelect?.(null, event);
       }
       return;
@@ -297,13 +328,13 @@
 <div
   class="grid"
   role="application"
-  aria-label="Timeline for {new Date(dayISO).toDateString()} — drag to create, drag edges to resize, drag body to move"
+  aria-label="Timeline for {new Date(dayISO).toDateString()} — hold or drag to add an entry, drag edges to resize, drag body to move"
   style:height="{minutesToPx(MINUTES_PER_DAY)}px"
   bind:this={gridEl}
   onpointerdown={beginCreate}
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
-  onpointercancel={onPointerUp}
+  onpointercancel={onPointerCancel}
   ontouchmove={onTouchMove}
 >
   {#each hours as h (h)}
@@ -328,6 +359,7 @@
       <TimeEntryBlock
         block={{ ...drag, id: '__ghost__', lane: 0, lanes: 1 }}
         label="New entry"
+        color="var(--no-project)"
         dragging
       />
     {/if}

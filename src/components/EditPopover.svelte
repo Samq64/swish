@@ -1,5 +1,5 @@
 <script>
-  import { startOfDay } from '../lib/time.js';
+  import { startOfDay, clamp } from '../lib/time.js';
   import { autofocus } from '../lib/actions.js';
   import TagCombobox from './TagCombobox.svelte';
 
@@ -12,7 +12,8 @@
     entry,
     projects = [],
     tags = [],
-    pos = { x: 0, y: 0 },
+    anchor = null,
+    bounds = null,
     running = false,
     onChange,
     onCreateTag,
@@ -21,31 +22,42 @@
     onClose,
   } = $props();
 
-  let dragDelta = $state({ x: 0, y: 0 });
-  let grabState = null;
+  const MARGIN = 8; // keep this far from every viewport edge
+  const GAP = 8; // offset from the anchored entry block
 
-  let finalX = $derived((pos?.x ?? 0) + dragDelta.x);
-  let finalY = $derived((pos?.y ?? 0) + dragDelta.y);
+  let el = $state(null);
+  let coords = $state(null);
 
-  // Reset drag offset whenever the anchor changes (new entry selected).
+  // Sit beside the selected entry (its on-screen rect = `anchor`) without ever
+  // covering it: prefer the right, flip left when the full width fits there,
+  // and when neither side fits, stay pinned to the entry's edge on the roomier
+  // side and run partially off-screen rather than overlap the entry. Vertically,
+  // align to the entry top but clamp inside `bounds` (the viewport minus the
+  // sticky header) so scrolling can't push the editor over the header UI.
+  // Re-runs as `anchor`/`bounds` follow the entry during drags and scrolls.
   $effect(() => {
-    pos.x + pos.y;
-    dragDelta = { x: 0, y: 0 };
-  });
+    if (!el || !anchor) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
 
-  function startDrag(e) {
-    if (e.button !== 0) return;
-    grabState = { startX: e.clientX, startY: e.clientY, dx: dragDelta.x, dy: dragDelta.y };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
-  function moveDrag(e) {
-    if (!grabState) return;
-    dragDelta = {
-      x: grabState.dx + e.clientX - grabState.startX,
-      y: grabState.dy + e.clientY - grabState.startY,
-    };
-  }
-  function endDrag() { grabState = null; }
+    const rightX = anchor.right + GAP;
+    const leftX = anchor.left - GAP - w;
+    let x;
+    if (rightX + w <= vw - MARGIN) {
+      x = rightX; // fits fully to the right
+    } else if (leftX >= MARGIN) {
+      x = leftX; // fits fully to the left
+    } else {
+      // No full fit either side — overflow on the roomier side, off the entry.
+      x = vw - anchor.right >= anchor.left ? rightX : leftX;
+    }
+
+    const top = (bounds?.top ?? 0) + MARGIN;
+    const bottom = (bounds?.bottom ?? window.innerHeight) - MARGIN;
+    const y = clamp(anchor.top, top, Math.max(top, bottom - h));
+    coords = { x, y };
+  });
 
   let assigned = $derived(new Set(entry.tagIds ?? []));
 
@@ -84,19 +96,13 @@
 
 <div
   class="popover"
-  style:left="{finalX}px"
-  style:top="{finalY}px"
+  bind:this={el}
+  style:left="{coords?.x ?? 0}px"
+  style:top="{coords?.y ?? 0}px"
+  style:visibility={coords ? 'visible' : 'hidden'}
   role="dialog"
   aria-label="Edit time entry"
 >
-  <div
-    class="drag-handle"
-    onpointerdown={startDrag}
-    onpointermove={moveDrag}
-    onpointerup={endDrag}
-    onpointercancel={endDrag}
-    aria-hidden="true"
-  ></div>
   <input
     class="desc"
     type="text"
@@ -161,25 +167,6 @@
 </div>
 
 <style>
-  .drag-handle {
-    height: 6px;
-    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    cursor: grab;
-    background: repeating-linear-gradient(
-      90deg,
-      var(--border) 0,
-      var(--border) 2px,
-      transparent 2px,
-      transparent 6px
-    );
-    opacity: 0.6;
-  }
-  .drag-handle:active {
-    cursor: grabbing;
-    opacity: 1;
-  }
-
   .popover {
     position: fixed;
     z-index: 50;
@@ -193,6 +180,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+  /* Narrower on phones so it leaves more of the timeline visible beside the
+     entry it's anchored to. */
+  @media (max-width: 640px) {
+    .popover {
+      width: 200px;
+    }
   }
   .desc {
     width: 100%;
