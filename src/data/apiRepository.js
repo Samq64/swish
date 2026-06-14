@@ -1,5 +1,5 @@
 /**
- * A {@link Repository} backed by the Cloudflare Pages Functions API at /api/*,
+ * A {@link Repository} backed by the SvelteKit JSON API at /api/*,
  * plus the auth methods the app needs (register/login/logout/me). Same-origin,
  * so the session cookie rides along automatically with `credentials: 'include'`.
  *

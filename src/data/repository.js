@@ -2,7 +2,8 @@
  * Data contract for the app. Everything above this line (store, components)
  * depends only on these async method shapes — never on *how* data is stored.
  * The live implementation is {@link module:apiRepository}, backed by the
- * Cloudflare Pages Functions API; the store talks only to this contract.
+ * SvelteKit JSON API at /api/* (src/routes/api/[...path]/+server.js); the
+ * store talks only to this contract.
  *
  * Entries, projects and tags all belong to a workspace; everything is scoped to
  * the authenticated user server-side. The id of each record is assigned by the

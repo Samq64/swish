@@ -1,6 +1,7 @@
 <script>
   import { store } from '../data/store.js';
   import { filterByName, hasExactName } from '../lib/search.js';
+  import Modal from '../lib/Modal.svelte';
   import Icon from '../lib/Icon.svelte';
 
   /** Modal for managing global tags: rename, add and delete. */
@@ -16,125 +17,60 @@
     store.addTag({ name });
     query = '';
   }
-
-  function onKeydown(event) {
-    if (event.key === 'Escape') onClose?.();
-  }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<Modal title="Tags" width={420} {onClose}>
+  <p class="hint">Tags are shared across every project.</p>
 
-<div
-  class="backdrop"
-  role="presentation"
-  onpointerdown={(e) => {
-    if (e.target === e.currentTarget) onClose?.();
-  }}
->
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Tags">
-    <header class="head">
-      <h2>Tags</h2>
-      <button class="close" aria-label="Close" onclick={() => onClose?.()}>
-        <Icon name="x" size={18} />
-      </button>
-    </header>
+  <input
+    class="search"
+    type="text"
+    placeholder="Search or create a tag…"
+    bind:value={query}
+  />
 
-    <p class="hint">Tags are shared across every project.</p>
-
-    <input
-      class="search"
-      type="text"
-      placeholder="Search or create a tag…"
-      bind:value={query}
-    />
-
-    <div class="list">
-      {#each filtered as t (t.id)}
-        <div class="row">
-          <span class="hash">#</span>
-          <input
-            class="name"
-            type="text"
-            value={t.name}
-            placeholder="Tag name"
-            oninput={(e) =>
-              store.updateTag(t.id, { name: e.currentTarget.value })}
-          />
-          <button
-            class="delete"
-            aria-label="Delete {t.name}"
-            onclick={() => store.removeTag(t.id)}
-          >
-            <Icon name="trash-2" size={16} />
-          </button>
-        </div>
-      {/each}
-
-      {#if query.trim() && !exact}
-        <button class="create-option" onclick={createFromSearch}>
-          <Icon name="plus" size={14} /> Create "#{query.trim()}"
+  <div class="list">
+    {#each filtered as t (t.id)}
+      <div class="row">
+        <span class="hash">#</span>
+        <input
+          class="name"
+          type="text"
+          value={t.name}
+          placeholder="Tag name"
+          oninput={(e) => store.updateTag(t.id, { name: e.currentTarget.value })}
+        />
+        <button
+          class="delete"
+          aria-label="Delete {t.name}"
+          onclick={() => store.removeTag(t.id)}
+        >
+          <Icon name="trash-2" size={16} />
         </button>
-      {:else if filtered.length === 0}
-        <p class="empty">
-          {store.tags.length === 0
-            ? 'Type a name above to create your first tag.'
-            : 'No matches.'}
-        </p>
-      {/if}
-    </div>
+      </div>
+    {/each}
 
-    <footer class="foot">
-      <button class="done" onclick={() => onClose?.()}>Done</button>
-    </footer>
+    {#if query.trim() && !exact}
+      <button class="create-option" onclick={createFromSearch}>
+        <Icon name="plus" size={14} /> Create "#{query.trim()}"
+      </button>
+    {:else if filtered.length === 0}
+      <p class="empty">
+        {store.tags.length === 0
+          ? 'Type a name above to create your first tag.'
+          : 'No matches.'}
+      </p>
+    {/if}
   </div>
-</div>
+</Modal>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 20, 30, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-  .modal {
-    width: 420px;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 64px);
-    display: flex;
-    flex-direction: column;
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  }
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-5) var(--space-2);
-  }
-  .head h2 {
-    margin: 0;
-    font-size: 17px;
-  }
-  .close {
-    border: none;
-    background: none;
-    font-size: 24px;
-    line-height: 1;
-    color: var(--muted);
-    padding: 0 var(--space-1);
-  }
   .hint {
     margin: 0;
-    padding: 0 var(--space-5) var(--space-2);
+    padding: var(--space-2) var(--space-5) 0;
     font-size: 12px;
     color: var(--muted);
-    border-bottom: 1px solid var(--border);
   }
-
   .search {
     margin: var(--space-2) var(--space-5) var(--space-1);
     border: 1px solid var(--border);
@@ -199,21 +135,5 @@
     font-size: 13px;
     text-align: center;
     padding: var(--space-4) 0;
-  }
-
-  .foot {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: var(--space-3) var(--space-5);
-    border-top: 1px solid var(--border);
-  }
-  .done {
-    border: none;
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius);
-    padding: var(--space-2) var(--space-4);
-    font-weight: 600;
   }
 </style>

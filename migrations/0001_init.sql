@@ -2,7 +2,7 @@
 --
 -- Everything is scoped to a user. Workspaces belong to a user; projects, tags
 -- and entries belong to a workspace; tags attach to entries via a join table.
--- Per-user settings (active workspace, onboarding) live on the users row.
+-- Per-user settings (active workspace) live on the users row.
 
 PRAGMA foreign_keys = ON;
 

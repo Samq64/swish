@@ -9,6 +9,7 @@ declare global {
         activeWorkspaceId: string | null;
         theme: 'auto' | 'light' | 'dark';
         weekStart: 0 | 1;
+        hour12: boolean;
       } | null;
     }
     interface Platform {

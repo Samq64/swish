@@ -1,5 +1,6 @@
 <script>
   import { store } from '../data/store.js';
+  import Modal from '../lib/Modal.svelte';
   import Icon from '../lib/Icon.svelte';
 
   /** Account settings: change password, sign out other sessions, delete account. */
@@ -63,163 +64,105 @@
       deleteBusy = false;
     }
   }
-
-  function onKeydown(event) {
-    if (event.key === 'Escape') onClose?.();
-  }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
-<div
-  class="backdrop"
-  role="presentation"
-  onpointerdown={(e) => {
-    if (e.target === e.currentTarget) onClose?.();
-  }}
->
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Settings">
-    <header class="head">
-      <h2>Settings</h2>
-      <button class="close" aria-label="Close" onclick={() => onClose?.()}>
-        <Icon name="x" size={18} />
-      </button>
-    </header>
-
-    <div class="body">
-      <section class="section">
-        <h3>Preferences</h3>
-        <div class="pref-row">
-          <span class="pref-label">Theme</span>
-          <div class="seg" role="group" aria-label="Theme">
-            {#each ['auto', 'light', 'dark'] as t (t)}
-              <button class:active={store.theme === t} onclick={() => store.setTheme(t)}>
-                {t}
-              </button>
-            {/each}
-          </div>
+<Modal title="Settings" width={440} {onClose}>
+  <div class="body">
+    <section class="section">
+      <h3>Preferences</h3>
+      <div class="pref-row">
+        <span class="pref-label">Theme</span>
+        <div class="seg" role="group" aria-label="Theme">
+          {#each ['auto', 'light', 'dark'] as t (t)}
+            <button class:active={store.theme === t} onclick={() => store.setTheme(t)}>
+              {t}
+            </button>
+          {/each}
         </div>
-        <div class="pref-row">
-          <span class="pref-label">Week starts</span>
-          <div class="seg" role="group" aria-label="Week start">
-            <button class:active={store.weekStart === 0} onclick={() => store.setWeekStart(0)}>
-              Sunday
-            </button>
-            <button class:active={store.weekStart === 1} onclick={() => store.setWeekStart(1)}>
-              Monday
-            </button>
-          </div>
-        </div>
-        <div class="pref-row">
-          <span class="pref-label">Clock</span>
-          <div class="seg" role="group" aria-label="Clock format">
-            <button class:active={store.hour12} onclick={() => store.setHour12(true)}>
-              12-hour
-            </button>
-            <button class:active={!store.hour12} onclick={() => store.setHour12(false)}>
-              24-hour
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h3>Account</h3>
-        <p class="account-line">
-          Signed in as <strong>{store.currentUser?.username}</strong>
-        </p>
-        <form onsubmit={(e) => (e.preventDefault(), submitPassword())}>
-          <input
-            type="password"
-            placeholder="Current password"
-            autocomplete="current-password"
-            bind:value={currentPassword}
-            required
-          />
-          <input
-            type="password"
-            placeholder="New password (min 8 characters)"
-            autocomplete="new-password"
-            bind:value={newPassword}
-            required
-          />
-          {#if pwError}<p class="msg error">{pwError}</p>{/if}
-          {#if pwOk}<p class="msg ok">Password updated. Other sessions were signed out.</p>{/if}
-          <button class="btn" type="submit" disabled={pwBusy}>
-            {pwBusy ? 'Updating…' : 'Update password'}
+      </div>
+      <div class="pref-row">
+        <span class="pref-label">Week starts</span>
+        <div class="seg" role="group" aria-label="Week start">
+          <button class:active={store.weekStart === 0} onclick={() => store.setWeekStart(0)}>
+            Sunday
           </button>
-        </form>
-      </section>
+          <button class:active={store.weekStart === 1} onclick={() => store.setWeekStart(1)}>
+            Monday
+          </button>
+        </div>
+      </div>
+      <div class="pref-row">
+        <span class="pref-label">Clock</span>
+        <div class="seg" role="group" aria-label="Clock format">
+          <button class:active={store.hour12} onclick={() => store.setHour12(true)}>
+            12-hour
+          </button>
+          <button class:active={!store.hour12} onclick={() => store.setHour12(false)}>
+            24-hour
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <section class="section">
-        <h3>Sessions</h3>
-        <p class="hint">Sign out everywhere except this device.</p>
-        {#if sessionsOk}<p class="msg ok">Other sessions signed out.</p>{/if}
-        <button class="btn" type="button" disabled={sessionsBusy} onclick={logoutOthers}>
-          {sessionsBusy ? 'Signing out…' : 'Log out other sessions'}
-        </button>
-      </section>
-
-      <section class="section danger">
-        <h3>Delete account</h3>
-        <p class="hint">
-          Permanently deletes your account and all workspaces, projects, tags
-          and entries. This cannot be undone.
-        </p>
+    <section class="section">
+      <h3>Account</h3>
+      <p class="account-line">
+        Signed in as <strong>{store.currentUser?.username}</strong>
+      </p>
+      <form onsubmit={(e) => (e.preventDefault(), submitPassword())}>
         <input
           type="password"
-          placeholder="Confirm password"
+          placeholder="Current password"
           autocomplete="current-password"
-          bind:value={deletePassword}
+          bind:value={currentPassword}
+          required
         />
-        {#if deleteError}<p class="msg error">{deleteError}</p>{/if}
-        <button class="btn delete" type="button" disabled={deleteBusy} onclick={deleteAccount}>
-          <Icon name="trash-2" size={15} />
-          {deleteBusy ? 'Deleting…' : 'Delete account'}
+        <input
+          type="password"
+          placeholder="New password (min 8 characters)"
+          autocomplete="new-password"
+          bind:value={newPassword}
+          required
+        />
+        {#if pwError}<p class="msg error">{pwError}</p>{/if}
+        {#if pwOk}<p class="msg ok">Password updated. Other sessions were signed out.</p>{/if}
+        <button class="btn" type="submit" disabled={pwBusy}>
+          {pwBusy ? 'Updating…' : 'Update password'}
         </button>
-      </section>
-    </div>
+      </form>
+    </section>
+
+    <section class="section">
+      <h3>Sessions</h3>
+      <p class="hint">Sign out everywhere except this device.</p>
+      {#if sessionsOk}<p class="msg ok">Other sessions signed out.</p>{/if}
+      <button class="btn" type="button" disabled={sessionsBusy} onclick={logoutOthers}>
+        {sessionsBusy ? 'Signing out…' : 'Log out other sessions'}
+      </button>
+    </section>
+
+    <section class="section danger">
+      <h3>Delete account</h3>
+      <p class="hint">
+        Permanently deletes your account and all workspaces, projects, tags
+        and entries. This cannot be undone.
+      </p>
+      <input
+        type="password"
+        placeholder="Confirm password"
+        autocomplete="current-password"
+        bind:value={deletePassword}
+      />
+      {#if deleteError}<p class="msg error">{deleteError}</p>{/if}
+      <button class="btn delete" type="button" disabled={deleteBusy} onclick={deleteAccount}>
+        <Icon name="trash-2" size={15} />
+        {deleteBusy ? 'Deleting…' : 'Delete account'}
+      </button>
+    </section>
   </div>
-</div>
+</Modal>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 20, 30, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-  .modal {
-    width: 440px;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 64px);
-    display: flex;
-    flex-direction: column;
-    background: var(--surface);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  }
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-5);
-    border-bottom: 1px solid var(--border);
-  }
-  .head h2 {
-    margin: 0;
-    font-size: 17px;
-  }
-  .close {
-    border: none;
-    background: none;
-    line-height: 1;
-    color: var(--muted);
-    padding: 0 var(--space-1);
-  }
   .body {
     padding: var(--space-4) var(--space-5);
     overflow-y: auto;

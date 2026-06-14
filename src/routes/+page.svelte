@@ -75,7 +75,7 @@
 </svelte:head>
 
 {#if !store.ready}
-  <!-- Loading the signed-in user's data; the middleware already gated access. -->
+  <!-- Loading the signed-in user's data; hooks.server.js already gated access. -->
 {:else}
 <header class="topbar">
   <WorkspaceSelector

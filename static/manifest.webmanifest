@@ -1,7 +1,7 @@
 {
   "name": "Time Tracker",
   "short_name": "Time Tracker",
-  "description": "A local-first time tracker. Your data stays in your browser.",
+  "description": "Track your time across projects, tags and workspaces.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

@@ -18,12 +18,11 @@
 </script>
 
 <svelte:head>
-  <title>swish — {isLogin ? 'Sign in' : 'Sign up'}</title>
+  <title>{isLogin ? 'Sign in' : 'Sign up'}</title>
 </svelte:head>
 
 <div class="auth-wrap">
   <form class="card" method="post">
-    <h1 class="brand">swish</h1>
     <p class="subtitle">{title}</p>
     <label>
       Username
@@ -70,13 +69,6 @@
     border-radius: var(--radius-lg);
     padding: 28px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
-  }
-  .brand {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--accent);
-    letter-spacing: -0.02em;
   }
   .subtitle {
     margin: 0 0 4px;
