@@ -102,6 +102,61 @@ textarea:focus {
   overflow: hidden;
 }
 
+/* Segmented control (view toggle, preference selectors). */
+.seg {
+  position: relative;
+  /* Grid with equal 1fr columns guarantees every segment is the same width
+     (sized to the widest label), regardless of the track's own width — unlike
+     flex, which keeps each button at its own label width when the track is
+     shrink-to-fit. This keeps the dividers and highlight (both 100% / count)
+     aligned to the real column edges, so labels keep their padding. */
+  display: inline-grid;
+  grid-template-columns: repeat(var(--seg-count, 3), 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* Segment dividers live on the track, *behind* the sliding highlight, so the
+     highlight glides over them instead of tucking under a border line. A 1px
+     rule sits at the end of each equal segment; the line at the very right edge
+     hides under the outer border, leaving only the internal dividers visible. */
+  background:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(100% / var(--seg-count, 3) - 1px),
+      var(--border) calc(100% / var(--seg-count, 3) - 1px),
+      var(--border) calc(100% / var(--seg-count, 3))
+    ),
+    var(--surface);
+}
+.seg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Exactly one (equal) column wide, so the highlight aligns to every segment
+     as it steps across. */
+  width: calc(100% / var(--seg-count, 3));
+  background: var(--accent);
+  transform: translateX(calc(var(--seg-active, 0) * 100%));
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.seg button {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 100ms ease;
+}
+.seg button.active {
+  color: #fff;
+}
+
 /* Dropdown panel anchored just below its trigger. */
 .dropdown-panel {
   position: absolute;

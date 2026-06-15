@@ -72,7 +72,12 @@
       <h3>Preferences</h3>
       <div class="pref-row">
         <span class="pref-label">Theme</span>
-        <div class="seg" role="group" aria-label="Theme">
+        <div
+          class="seg"
+          role="group"
+          aria-label="Theme"
+          style="--seg-active: {store.theme === 'auto' ? 0 : store.theme === 'light' ? 1 : 2}; --seg-count: 3"
+        >
           {#each ['auto', 'light', 'dark'] as t (t)}
             <button class:active={store.theme === t} onclick={() => store.setTheme(t)}>
               {t}
@@ -82,7 +87,12 @@
       </div>
       <div class="pref-row">
         <span class="pref-label">Week starts</span>
-        <div class="seg" role="group" aria-label="Week start">
+        <div
+          class="seg"
+          role="group"
+          aria-label="Week start"
+          style="--seg-active: {store.weekStart}; --seg-count: 2"
+        >
           <button class:active={store.weekStart === 0} onclick={() => store.setWeekStart(0)}>
             Sunday
           </button>
@@ -93,7 +103,12 @@
       </div>
       <div class="pref-row">
         <span class="pref-label">Clock</span>
-        <div class="seg" role="group" aria-label="Clock format">
+        <div
+          class="seg"
+          role="group"
+          aria-label="Clock format"
+          style="--seg-active: {store.hour12 ? 0 : 1}; --seg-count: 2"
+        >
           <button class:active={store.hour12} onclick={() => store.setHour12(true)}>
             12-hour
           </button>
@@ -200,28 +215,10 @@
     color: var(--muted);
   }
   .seg {
-    display: inline-flex;
     width: 220px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
   }
   .seg button {
-    flex: 1;
-    border: none;
-    background: var(--surface);
-    color: var(--muted);
-    padding: var(--space-1) var(--space-3);
-    font-size: 13px;
-    font-weight: 600;
     text-transform: capitalize;
-  }
-  .seg button + button {
-    border-left: 1px solid var(--border);
-  }
-  .seg button.active {
-    background: var(--accent);
-    color: #fff;
   }
   .hint {
     margin: 0;

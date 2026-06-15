@@ -132,7 +132,12 @@
     <span class="total">{formatDuration(totalMin)} tracked</span>
   </div>
 
-  <div class="view-toggle" role="group" aria-label="View">
+  <div
+    class="seg"
+    role="group"
+    aria-label="View"
+    style="--seg-active: {store.view === 'week' ? 0 : store.view === 'day' ? 1 : 2}; --seg-count: 3"
+  >
     <button
       class:active={store.view === 'week'}
       onclick={() => store.setView('week')}
@@ -151,9 +156,9 @@
   </div>
 </nav>
 
-<main class="timeline-wrap">
+<main class="fill-col view-host">
   {#key store.view}
-    <div class="view-fade" in:fade={{ duration: 140 }}>
+    <div class="fill-col view-layer" in:fade={{ duration: 160 }} out:fade={{ duration: 160 }}>
       {#if store.view === 'list'}
         <ListView />
       {:else}
@@ -207,11 +212,18 @@
     flex: none;
   }
   /* The timer absorbs the topbar's spare/short space so the buttons keep
-     their size; min-width:0 lets it actually shrink (not just its input). */
+     their size; min-width:0 lets it actually shrink (not just its input).
+     min-height encodes the timer bar's exact border-box height so the topbar
+     stays the same height in read-only mode (no timer bar present):
+       timer-bar border (2px) + outer padding (space-1 × 2)
+       + toggle padding (space-2 × 2) + 1em (toggle line-height is 1).
+     align-self:stretch lets the readonly-banner fill that height via flex. */
   .timer-slot {
     flex: 1;
     min-width: 0;
     display: flex;
+    align-self: stretch;
+    min-height: calc(2px + var(--space-1) * 2 + var(--space-2) * 2 + 1em);
   }
   .readonly-banner {
     flex: 1;
@@ -219,7 +231,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    height: 100%;
     padding: var(--space-1) var(--space-3);
     border: 1px dashed var(--border);
     border-radius: var(--radius);
@@ -253,7 +264,7 @@
     border: 1px solid var(--border);
     background: var(--surface);
     border-radius: var(--radius);
-    padding: var(--space-1) var(--space-3);
+    padding: 6px var(--space-3);
     color: var(--text);
     line-height: 1;
   }
@@ -264,7 +275,7 @@
     border: 1px solid var(--border);
     background: var(--surface);
     border-radius: var(--radius);
-    padding: var(--space-1) var(--space-3);
+    padding: 6px var(--space-3);
     color: var(--text);
     font-size: 14px;
   }
@@ -278,26 +289,16 @@
     text-overflow: ellipsis;
   }
 
-  .view-toggle {
+  .seg {
     flex: none;
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
   }
-  .view-toggle button {
-    border: none;
-    background: var(--surface);
-    padding: var(--space-1) var(--space-3);
-    color: var(--muted);
-    font-weight: 600;
+
+  .view-host {
+    position: relative;
   }
-  .view-toggle button + button {
-    border-left: 1px solid var(--border);
-  }
-  .view-toggle button.active {
-    background: var(--accent);
-    color: white;
+  .view-layer {
+    position: absolute;
+    inset: 0;
   }
 
   .total {
@@ -311,20 +312,6 @@
     margin-right: var(--space-2);
   }
 
-  .timeline-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .view-fade {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
   /* On narrow windows, move the view toggle above the date controls so it's
      always visible at the top of the nav row. */
   @media (max-width: 768px) {
@@ -336,13 +323,10 @@
       flex-wrap: wrap;
       flex-basis: 100%;
     }
-    .view-toggle {
+    .seg {
       order: -1;
       flex: 1;
       flex-basis: 100%;
-    }
-    .view-toggle button {
-      flex: 1;
     }
   }
 
