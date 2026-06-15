@@ -73,7 +73,7 @@
     placeholder="What are you working on?"
     bind:this={descInput}
     bind:value={description}
-    oninput={() => running && store.update(running.id, { description })}
+    onchange={() => running && store.update(running.id, { description })}
   />
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
   <button class="toggle" class:running type="submit" disabled={!canStart}>

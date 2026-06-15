@@ -39,7 +39,7 @@
           value={t.name}
           placeholder="Tag name"
           readonly={store.readOnly}
-          oninput={(e) => store.updateTag(t.id, { name: e.currentTarget.value })}
+          onchange={(e) => store.updateTag(t.id, { name: e.currentTarget.value })}
         />
         {#if !store.readOnly}
           <button
