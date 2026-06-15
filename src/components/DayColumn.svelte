@@ -468,6 +468,7 @@
     flex: 1;
     min-width: 84px;
     border-left: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     /* Let touch pan both ways (vertical hours + horizontal week scroll);
        creating is gated behind a long-press, which preventDefaults the pan. */
     touch-action: pan-x pan-y;

@@ -212,12 +212,12 @@
   :global(body) {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh;
   }
   :global(#app) {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
 
@@ -295,12 +295,8 @@
     background: var(--bg);
   }
   .date-input {
-    border: 1px solid var(--border);
     background: var(--surface);
-    border-radius: var(--radius);
     padding: 6px var(--space-3);
-    color: var(--text);
-    font-size: 14px;
   }
   .range-label {
     margin: 0 0 0 var(--space-1);

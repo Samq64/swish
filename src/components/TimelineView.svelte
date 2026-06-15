@@ -219,12 +219,12 @@
     top: 0;
     z-index: 10;
     display: flex;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
   }
   .gutter-spacer {
     width: 56px;
     flex: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
   .day-head {
     flex: 1;
@@ -235,6 +235,10 @@
     gap: var(--space-2);
     padding: var(--space-2) var(--space-1);
     border-left: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    /* Each cell needs its own background/borders because on narrow screens the
+       cells overflow */
+    background: var(--surface);
   }
   .day-head .dow {
     font-size: 12px;
@@ -266,6 +270,8 @@
        Containing the overscroll keeps the drag ours; normal scrolling is
        unaffected. */
     overscroll-behavior-y: contain;
+    /* Ensure the last hour is reachable above the Android system nav bar. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .body {
     display: flex;
@@ -275,6 +281,7 @@
     width: 56px;
     flex: none;
     position: relative;
+    border-bottom: 1px solid var(--border);
   }
   .hour-label {
     position: absolute;

@@ -335,7 +335,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .dd-name.none {
+  .dd-name.none,
+  .opt-name.none {
     color: var(--muted);
   }
   .caret {
@@ -372,9 +373,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .opt-name.none {
-    color: var(--muted);
   }
   .check {
     width: 14px;
