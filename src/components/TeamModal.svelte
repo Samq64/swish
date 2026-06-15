@@ -158,7 +158,11 @@
       {/each}
 
       {#if !teams.length && !invites.length}
-        <p class="empty">You're not on a team yet. Create one below to start sharing.</p>
+        <p class="empty">
+          You're not on a team yet. Create one below to start sharing.
+          <br />
+          Waiting on an invite? Reopen this window to check for new ones.
+        </p>
       {/if}
     {/if}
   </div>
