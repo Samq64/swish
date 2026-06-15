@@ -320,7 +320,6 @@
       return;
     }
     const d = drag;
-    timelineDrag.clear();
     frozenLanes = null;
     gridEl.releasePointerCapture?.(event.pointerId);
 
@@ -334,12 +333,16 @@
           start: minutesToISO(dayISO, d.startMin),
           end: minutesToISO(dayISO, d.endMin),
         });
+        timelineDrag.clear();
         onSelect?.(entry.id, event);
       } else {
+        timelineDrag.clear();
         onSelect?.(null, event);
       }
       return;
     }
+
+    timelineDrag.clear();
 
     if (d.entryId) {
       if (d.moved) {
@@ -412,10 +415,10 @@
       />
     {/each}
 
-    {#if drag?.mode === 'create' && drag.endMin > drag.startMin}
+    {#if drag?.mode === 'create' && drag.originDayISO === dayISO && drag.endMin > drag.startMin}
       <TimeEntryBlock
         block={{ ...drag, id: '__ghost__', lane: 0, lanes: 1 }}
-        label="New entry"
+        label=""
         color="var(--no-project)"
         hour12={store.hour12}
         dragging
@@ -463,7 +466,7 @@
   .grid {
     position: relative;
     flex: 1;
-    min-width: 0;
+    min-width: 84px;
     border-left: 1px solid var(--border);
     /* Let touch pan both ways (vertical hours + horizontal week scroll);
        creating is gated behind a long-press, which preventDefaults the pan. */
@@ -498,11 +501,4 @@
     background: #e74c3c;
   }
 
-  /* Keep week columns usable on phones (matches .day-head); the timeline
-     scrolls sideways rather than squeezing them to nothing. */
-  @media (max-width: 640px) {
-    .grid {
-      min-width: 84px;
-    }
-  }
 </style>
