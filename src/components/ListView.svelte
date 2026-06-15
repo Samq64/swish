@@ -86,7 +86,7 @@
   }
 </script>
 
-<div class="list-view">
+<div class="list-view fill-col">
   <div class="filter-bar">
     <div class="filter-rows">
       <div class="filter-row">
@@ -209,10 +209,6 @@
 
 <style>
   .list-view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
     background: var(--surface);
   }
 
@@ -257,6 +253,7 @@
     border-radius: 999px;
     padding: 2px var(--space-2);
     font-size: 12px;
+    font-weight: 600;
   }
   .chip .dot {
     width: 8px;
@@ -268,7 +265,6 @@
     background: color-mix(in srgb, var(--accent) 15%, var(--surface));
     border-color: var(--accent);
     color: var(--accent);
-    font-weight: 600;
   }
   .clear {
     flex: none;
@@ -291,19 +287,23 @@
   .scroll {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-2) 0 var(--space-5);
-  }
-  .day-group {
-    margin-bottom: var(--space-2);
+    /* No top padding: a sticky header sticks at the scrollport's content edge,
+       so any top padding leaves a gap where scrolling rows peek above it. The
+       header's own padding-top supplies the breathing room instead. */
+    padding: 0 0 var(--space-5);
   }
   .day-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-5) var(--space-1);
+    padding: var(--space-2) var(--space-5);
     position: sticky;
     top: 0;
-    background: var(--surface);
+    z-index: 1;
+    /* A distinct band colour (not the list surface) so the day grouping reads
+       clearly, stuck or not. */
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
   .day-head h3 {
     margin: 0;
@@ -329,10 +329,13 @@
     color: inherit;
   }
   .row:hover {
-    background: var(--bg);
+    /* A neutral tint that lifts off the surface in both themes (lightens in
+       dark, darkens in light). var(--bg) read as a darker "hole" against the
+       lighter surface in dark mode. */
+    background: color-mix(in srgb, var(--text) 6%, var(--surface));
   }
   .row.selected {
-    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   }
   .dot {
     width: 10px;
