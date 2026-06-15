@@ -13,6 +13,7 @@
   import TagsModal from '../components/TagsModal.svelte';
   import SettingsModal from '../components/SettingsModal.svelte';
   import WorkspacesModal from '../components/WorkspacesModal.svelte';
+  import TeamModal from '../components/TeamModal.svelte';
 
   let { data } = $props();
   // One-time seed from the server load; intentionally reads the initial `data`
@@ -32,6 +33,7 @@
   let showTags = $state(false);
   let showSettings = $state(false);
   let showWorkspaces = $state(false);
+  let showTeam = $state(false);
 
   // Range label: a single day, or "Jun 7 – 13" for a week (month always first).
   let rangeLabel = $derived.by(() => {
@@ -66,6 +68,11 @@
     store.goToDate(new Date(y, m - 1, d)); // local date, no UTC shift
   }
 
+  // Owner of the currently-viewed shared workspace (null when viewing your own).
+  let sharedOwner = $derived(
+    store.sharedWorkspaces.find((w) => w.id === store.currentWorkspaceId)?.ownerUsername ?? null,
+  );
+
   // Total tracked minutes across the visible range (completed entries only).
   let totalMin = $derived(
     store.entries
@@ -85,8 +92,18 @@
   <WorkspaceSelector
     onOpenSettings={() => (showSettings = true)}
     onManageWorkspaces={() => (showWorkspaces = true)}
+    onOpenTeam={() => (showTeam = true)}
   />
-  <div class="timer-slot"><TimerBar /></div>
+  <div class="timer-slot">
+    {#if store.readOnly}
+      <div class="readonly-banner" role="status">
+        <Icon name="users" size={15} />
+        <span>Read-only{sharedOwner ? ` · shared by ${sharedOwner}` : ''}</span>
+      </div>
+    {:else}
+      <TimerBar />
+    {/if}
+  </div>
   <div class="topbar-actions">
     <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
     <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
@@ -158,6 +175,9 @@
 {#if showWorkspaces}
   <WorkspacesModal onClose={() => (showWorkspaces = false)} />
 {/if}
+{#if showTeam}
+  <TeamModal onClose={() => (showTeam = false)} />
+{/if}
 {/if}
 
 <style>
@@ -192,6 +212,20 @@
     flex: 1;
     min-width: 0;
     display: flex;
+  }
+  .readonly-banner {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 100%;
+    padding: var(--space-1) var(--space-3);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
   }
   /* Match the taller timer bar so the header controls line up. */
   .topbar-actions .nav-btn {

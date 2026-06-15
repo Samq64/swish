@@ -8,9 +8,20 @@
    * workspaces — plus Settings and Log out. Creating, renaming, exporting,
    * importing and deleting workspaces live in the Settings modal.
    */
-  let { onOpenSettings, onManageWorkspaces } = $props();
+  let { onOpenSettings, onManageWorkspaces, onOpenTeam } = $props();
 
   let open = $state(false);
+
+  // Shared workspaces grouped by the user who shared them, so each owner shows
+  // as their own labeled submenu in the dropdown.
+  let sharedByOwner = $derived.by(() => {
+    const groups = new Map();
+    for (const w of store.sharedWorkspaces) {
+      if (!groups.has(w.ownerUsername)) groups.set(w.ownerUsername, []);
+      groups.get(w.ownerUsername).push(w);
+    }
+    return [...groups];
+  });
 
   function initial(name) {
     return (name ?? '?').trim().slice(0, 1).toUpperCase() || '?';
@@ -41,7 +52,7 @@
 
   {#if open}
     <div class="panel">
-      <div class="panel-label">Workspaces</div>
+      <div class="panel-label">My workspaces</div>
       <div class="options">
         {#each store.workspaces as w (w.id)}
           {@const isCurrent = w.id === store.currentWorkspaceId}
@@ -54,9 +65,27 @@
         {/each}
       </div>
 
+      {#each sharedByOwner as [owner, list] (owner)}
+        <div class="panel-label">{owner}'s workspaces</div>
+        <div class="options">
+          {#each list as w (w.id)}
+            {@const isCurrent = w.id === store.currentWorkspaceId}
+            <button class="option" class:current={isCurrent} onclick={() => pick(w.id)}>
+              <span class="check">
+                {#if isCurrent}<Icon name="check" size={14} />{/if}
+              </span>
+              <span class="opt-name">{w.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/each}
+
       <div class="menu">
         <button class="menu-item" onclick={() => run(onManageWorkspaces)}>
           <Icon name="folder" size={15} /> Manage workspaces
+        </button>
+        <button class="menu-item" onclick={() => run(onOpenTeam)}>
+          <Icon name="users" size={15} /> Team
         </button>
         <button class="menu-item" onclick={() => run(onOpenSettings)}>
           <Icon name="settings" size={15} /> Settings

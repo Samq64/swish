@@ -10,7 +10,7 @@ import { json, error, readJson, sameOrigin } from '$lib/server/http.js';
 import { isIso, isStr, isStrArray, isHexColor } from '$lib/server/validate.js';
 import { hashPassword, verifyPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
 import { clearSessionCookie } from '$lib/server/session.js';
-import { listWorkspaces, listProjects, listTags } from '$lib/server/data.js';
+import { listWorkspaces, listProjects, listTags, listSharedWorkspaces } from '$lib/server/data.js';
 
 const LIST_SCOPED = { projects: listProjects, tags: listTags };
 
@@ -56,6 +56,10 @@ async function route(event) {
       return handleScoped(ctx, 'tags', segs.slice(1), method, user);
     case 'workspaces':
       return handleWorkspaces(ctx, segs.slice(1), method, user);
+    case 'teams':
+      return handleTeams(ctx, segs.slice(1), method, user);
+    case 'shared':
+      return handleShared(ctx, segs.slice(1), method, user);
     case 'settings':
       return handleSettings(ctx, segs.slice(1), method, user);
     default:
@@ -71,6 +75,24 @@ async function ownsWorkspace(env, userId, workspaceId) {
     'SELECT 1 AS ok FROM workspaces WHERE id = ? AND user_id = ?',
   )
     .bind(workspaceId, userId)
+    .first();
+  return !!row;
+}
+
+// Read access: the owner, OR the manager of the team the owner is an active
+// member of — provided the owner hasn't hidden this workspace (shared = 1).
+// Writes never use this — they require ownsWorkspace (owner only).
+async function canReadWorkspace(env, userId, workspaceId) {
+  if (!workspaceId) return false;
+  const row = await env.DB.prepare(
+    `SELECT 1 AS ok FROM workspaces WHERE id = ? AND user_id = ?
+     UNION
+     SELECT 1 FROM workspaces w
+       JOIN team_members m ON m.user_id = w.user_id AND m.status = 'active'
+       JOIN teams t        ON t.id = m.team_id AND t.manager_id = ?
+      WHERE w.id = ? AND w.shared = 1`,
+  )
+    .bind(workspaceId, userId, userId, workspaceId)
     .first();
   return !!row;
 }
@@ -165,7 +187,7 @@ async function handleEntries(ctx, rest, method, user) {
       const workspaceId = url.searchParams.get('workspaceId');
       const from = url.searchParams.get('from');
       const to = url.searchParams.get('to');
-      if (!(await ownsWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
+      if (!(await canReadWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
       if (!isIso(from) || !isIso(to)) return error(400, 'from and to must be ISO timestamps');
       // The open running entry is always returned, even outside [from, to), so
       // the timer is consistent on every device and view.
@@ -304,7 +326,7 @@ async function handleScoped(ctx, table, rest, method, user) {
   if (rest.length === 0) {
     if (method === 'GET') {
       const workspaceId = new URL(request.url).searchParams.get('workspaceId');
-      if (!(await ownsWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
+      if (!(await canReadWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
       return json(await LIST_SCOPED[table](env, workspaceId));
     }
     if (method === 'POST') {
@@ -389,7 +411,8 @@ async function handleWorkspaces(ctx, rest, method, user) {
       await env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)')
         .bind(id, user.id, name)
         .run();
-      return json({ id, name });
+      // shared defaults to 1 (true) in the schema.
+      return json({ id, name, shared: true });
     }
     return error(405, 'Method not allowed');
   }
@@ -412,9 +435,21 @@ async function handleWorkspaces(ctx, rest, method, user) {
     const body = (await readJson(request)) || {};
     if (body.name != null && !isStr(body.name, { max: NAME_MAX }))
       return error(400, 'name must be a string');
-    const name = (body.name ?? '').toString();
-    await env.DB.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(name, id).run();
-    return json({ id, name });
+    if ('shared' in body && typeof body.shared !== 'boolean')
+      return error(400, 'shared must be a boolean');
+    const sets = [];
+    const vals = [];
+    if (body.name != null) (sets.push('name = ?'), vals.push(body.name.toString()));
+    if ('shared' in body) (sets.push('shared = ?'), vals.push(body.shared ? 1 : 0));
+    if (sets.length) {
+      await env.DB.prepare(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = ?`)
+        .bind(...vals, id)
+        .run();
+    }
+    const row = await env.DB.prepare('SELECT id, name, shared FROM workspaces WHERE id = ?')
+      .bind(id)
+      .first();
+    return json({ id: row.id, name: row.name, shared: row.shared !== 0 });
   }
 
   if (method === 'DELETE') {
@@ -504,6 +539,183 @@ async function importWorkspace(env, userId, payload) {
   return { id: wsId, name };
 }
 
+// --- teams & sharing ---------------------------------------------------------
+
+/** True when `userId` manages `teamId` (its creator — the team's sole manager). */
+async function isTeamManager(env, userId, teamId) {
+  const row = await env.DB.prepare('SELECT 1 AS ok FROM teams WHERE id = ? AND manager_id = ?')
+    .bind(teamId, userId)
+    .first();
+  return !!row;
+}
+
+/** The caller's active team (one or none) and any pending invitations. */
+async function listTeamsForUser(env, userId) {
+  const { results: memberships } = await env.DB.prepare(
+    `SELECT t.id, t.name, t.manager_id, tm.status
+       FROM team_members tm JOIN teams t ON t.id = tm.team_id
+      WHERE tm.user_id = ?
+      ORDER BY t.name COLLATE NOCASE`,
+  )
+    .bind(userId)
+    .all();
+
+  const teams = [];
+  const invites = [];
+  for (const m of memberships) {
+    if (m.status === 'invited') {
+      invites.push({ teamId: m.id, name: m.name });
+      continue;
+    }
+    const isManager = m.manager_id === userId;
+    const team = { id: m.id, name: m.name, role: isManager ? 'manager' : 'member' };
+    // Everyone sees the roster (so a member knows who else is on the team), but
+    // only the manager sees who still has a pending, unaccepted invite.
+    const { results: mem } = await env.DB.prepare(
+      `SELECT tm.user_id, u.username, tm.status
+         FROM team_members tm JOIN users u ON u.id = tm.user_id
+        WHERE tm.team_id = ?
+        ORDER BY u.username COLLATE NOCASE`,
+    )
+      .bind(m.id)
+      .all();
+    team.members = mem
+      .filter((r) => isManager || r.status === 'active')
+      .map((r) => ({
+        userId: r.user_id,
+        username: r.username,
+        role: r.user_id === m.manager_id ? 'manager' : 'member',
+        status: r.status,
+      }));
+    teams.push(team);
+  }
+  return { teams, invites };
+}
+
+/** Whether `userId` is already an active member of some team. */
+async function hasActiveTeam(env, userId) {
+  const row = await env.DB.prepare(
+    "SELECT 1 AS ok FROM team_members WHERE user_id = ? AND status = 'active'",
+  )
+    .bind(userId)
+    .first();
+  return !!row;
+}
+
+async function handleTeams(ctx, rest, method, user) {
+  const { env, request } = ctx;
+
+  if (rest.length === 0) {
+    if (method === 'GET') return json(await listTeamsForUser(env, user.id));
+    if (method === 'POST') {
+      const body = (await readJson(request)) || {};
+      if (body.name != null && !isStr(body.name, { max: NAME_MAX }))
+        return error(400, 'name must be a string');
+      // One active team per user — you can't found a team while on one.
+      if (await hasActiveTeam(env, user.id)) return error(409, 'You are already on a team');
+      const id = crypto.randomUUID();
+      const name = (body.name ?? 'Team').toString();
+      const now = new Date().toISOString();
+      // The creator is the manager and an active member.
+      await env.DB.batch([
+        env.DB
+          .prepare('INSERT INTO teams (id, name, manager_id, created_at) VALUES (?,?,?,?)')
+          .bind(id, name, user.id, now),
+        env.DB
+          .prepare('INSERT INTO team_members (team_id, user_id, status, created_at) VALUES (?,?,?,?)')
+          .bind(id, user.id, 'active', now),
+      ]);
+      return json({ id, name });
+    }
+    return error(405, 'Method not allowed');
+  }
+
+  const teamId = rest[0];
+
+  // Accept a pending invitation. Refused if already on another team.
+  if (rest[1] === 'accept' && method === 'POST') {
+    if (await hasActiveTeam(env, user.id))
+      return error(409, 'Leave your current team before joining another');
+    const res = await env.DB.prepare(
+      "UPDATE team_members SET status = 'active' WHERE team_id = ? AND user_id = ? AND status = 'invited'",
+    )
+      .bind(teamId, user.id)
+      .run();
+    if (!res.meta.changes) return error(404, 'Not found');
+    return json({ ok: true });
+  }
+
+  // Invite a user by username (manager only). They must not already be on a team.
+  if (rest[1] === 'invites' && method === 'POST') {
+    if (!(await isTeamManager(env, user.id, teamId))) return error(403, 'Forbidden');
+    const body = (await readJson(request)) || {};
+    if (!isStr(body.username, { min: 1, max: NAME_MAX })) return error(400, 'username required');
+    const target = await env.DB.prepare('SELECT id FROM users WHERE username = ?')
+      .bind(body.username)
+      .first();
+    if (!target) return error(404, 'No such user');
+    if (target.id === user.id) return error(400, 'You are already in this team');
+    if (await hasActiveTeam(env, target.id)) return error(409, 'That user is already on a team');
+    // Idempotent: a repeated invite is a no-op.
+    await env.DB.prepare(
+      `INSERT INTO team_members (team_id, user_id, status, created_at)
+       VALUES (?,?,?,?) ON CONFLICT(team_id, user_id) DO NOTHING`,
+    )
+      .bind(teamId, target.id, 'invited', new Date().toISOString())
+      .run();
+    return json({ ok: true });
+  }
+
+  // Leave a team or decline an invitation (acts on the caller's own membership).
+  // The manager can't leave — deleting the team is the path for that.
+  if (rest[1] === 'leave' && method === 'POST') {
+    const res = await env.DB.prepare(
+      `DELETE FROM team_members
+        WHERE team_id = ? AND user_id = ?
+          AND user_id != (SELECT manager_id FROM teams WHERE id = ?)`,
+    )
+      .bind(teamId, user.id, teamId)
+      .run();
+    if (!res.meta.changes) return error(404, 'Not found');
+    return new Response(null, { status: 204 });
+  }
+
+  // Manager removes a member (the manager can't be removed this way).
+  if (rest[1] === 'members' && rest[2] && method === 'DELETE') {
+    if (!(await isTeamManager(env, user.id, teamId))) return error(403, 'Forbidden');
+    const res = await env.DB.prepare(
+      `DELETE FROM team_members
+        WHERE team_id = ? AND user_id = ?
+          AND user_id != (SELECT manager_id FROM teams WHERE id = ?)`,
+    )
+      .bind(teamId, rest[2], teamId)
+      .run();
+    if (!res.meta.changes) return error(404, 'Not found');
+    return new Response(null, { status: 204 });
+  }
+
+  // Delete the whole team (manager only); cascade drops memberships. Members'
+  // workspaces and data are untouched.
+  if (rest.length === 1 && method === 'DELETE') {
+    if (!(await isTeamManager(env, user.id, teamId))) return error(403, 'Forbidden');
+    await env.DB.prepare('DELETE FROM teams WHERE id = ?').bind(teamId).run();
+    return new Response(null, { status: 204 });
+  }
+
+  return error(405, 'Method not allowed');
+}
+
+async function handleShared(ctx, rest, method, user) {
+  const { env } = ctx;
+  // Read-only list of workspaces shared with the caller (as a team manager).
+  // Removal isn't a manager action — the owner controls sharing via the
+  // workspace's `shared` flag (PATCH /workspaces/:id).
+  if (rest.length === 0 && method === 'GET') {
+    return json(await listSharedWorkspaces(env, user.id));
+  }
+  return error(405, 'Method not allowed');
+}
+
 // --- settings ----------------------------------------------------------------
 
 async function handleSettings(ctx, rest, method, user) {
@@ -512,7 +724,9 @@ async function handleSettings(ctx, rest, method, user) {
 
   if (rest[0] === 'active-workspace') {
     const body = (await readJson(request)) || {};
-    if (!(await ownsWorkspace(env, user.id, body.workspaceId))) return error(403, 'Forbidden');
+    // A shared (read-only) workspace can be the active view too, so this allows
+    // any workspace the user can read, not just ones they own.
+    if (!(await canReadWorkspace(env, user.id, body.workspaceId))) return error(403, 'Forbidden');
     await env.DB.prepare('UPDATE users SET active_workspace_id = ? WHERE id = ?')
       .bind(body.workspaceId, user.id)
       .run();

@@ -36,7 +36,7 @@
   <input
     class="search"
     type="text"
-    placeholder="Search or create a project…"
+    placeholder={store.readOnly ? 'Search projects…' : 'Search or create a project…'}
     bind:value={query}
   />
 
@@ -48,50 +48,60 @@
           type="color"
           value={p.color}
           aria-label="Colour for {p.name}"
+          disabled={store.readOnly}
           oninput={(e) =>
             store.updateProject(p.id, { color: e.currentTarget.value })}
         />
 
-        <div class="palette">
-          {#each PALETTE as c (c)}
-            <button
-              class="dot"
-              class:selected={p.color?.toLowerCase() === c}
-              style:background={c}
-              aria-label="Set colour {c}"
-              onclick={() => store.updateProject(p.id, { color: c })}
-            ></button>
-          {/each}
-        </div>
+        {#if !store.readOnly}
+          <div class="palette">
+            {#each PALETTE as c (c)}
+              <button
+                class="dot"
+                class:selected={p.color?.toLowerCase() === c}
+                style:background={c}
+                aria-label="Set colour {c}"
+                onclick={() => store.updateProject(p.id, { color: c })}
+              ></button>
+            {/each}
+          </div>
+        {/if}
 
         <input
           class="name"
           type="text"
           value={p.name}
           placeholder="Project name"
+          readonly={store.readOnly}
           oninput={(e) =>
             store.updateProject(p.id, { name: e.currentTarget.value })}
         />
 
-        <button
-          class="delete"
-          aria-label="Delete {p.name}"
-          onclick={() => store.removeProject(p.id)}
-        >
-          <Icon name="trash-2" size={16} />
-        </button>
+        {#if !store.readOnly}
+          <button
+            class="delete"
+            aria-label="Delete {p.name}"
+            onclick={() => store.removeProject(p.id)}
+          >
+            <Icon name="trash-2" size={16} />
+          </button>
+        {/if}
       </div>
     {/each}
 
-    {#if query.trim() && !exact}
+    {#if query.trim() && !exact && !store.readOnly}
       <button class="create-option" onclick={createFromSearch}>
         <Icon name="plus" size={14} /> Create "{query.trim()}"
       </button>
     {:else if filtered.length === 0}
       <p class="empty">
-        {store.projects.length === 0
-          ? 'Type a name above to create your first project.'
-          : 'No matches.'}
+        {#if store.projects.length > 0}
+          No matches.
+        {:else if store.readOnly}
+          No projects.
+        {:else}
+          Type a name above to create your first project.
+        {/if}
       </p>
     {/if}
   </div>

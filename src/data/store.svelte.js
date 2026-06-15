@@ -17,6 +17,13 @@ export class AppStore {
   tags = $state([]);
   /** @type {import('./repository.js').Workspace[]} */
   workspaces = $state([]);
+  /**
+   * Workspaces other users have shared with this user (read-only manager view).
+   * Each is { id, name, ownerUsername }.
+   */
+  sharedWorkspaces = $state([]);
+  /** The user's role on their single active team: 'manager' | 'member' | null. */
+  teamRole = $state(null);
   /** Id of the workspace whose data is currently loaded. */
   currentWorkspaceId = $state(null);
   /** The signed-in user ({ username }), or null when logged out. */
@@ -64,9 +71,21 @@ export class AppStore {
   /** Map of tagId -> tag. */
   tagsById = $derived(new Map(this.tags.map((t) => [t.id, t])));
 
-  /** The workspace whose data is loaded. */
+  /** The workspace whose data is loaded (owned or shared with this user). */
   currentWorkspace = $derived(
-    this.workspaces.find((w) => w.id === this.currentWorkspaceId) ?? null,
+    this.workspaces.find((w) => w.id === this.currentWorkspaceId) ??
+      this.sharedWorkspaces.find((w) => w.id === this.currentWorkspaceId) ??
+      null,
+  );
+
+  /**
+   * True when the loaded workspace is one shared with this user rather than one
+   * they own: the manager view is read-only. The server enforces this too; the
+   * flag lets the UI hide write affordances.
+   */
+  readOnly = $derived(
+    this.currentWorkspaceId != null &&
+      !this.workspaces.some((w) => w.id === this.currentWorkspaceId),
   );
 
   /** The currently running entry (open-ended), if any. */
@@ -84,12 +103,25 @@ export class AppStore {
    * so there's no client-side bootstrap waterfall. Entries depend on the local
    * date range, which the server can't know, so they're fetched here.
    */
-  hydrate({ username, theme, weekStart, hour12, workspaces, activeWorkspaceId, projects, tags }) {
+  hydrate({
+    username,
+    theme,
+    weekStart,
+    hour12,
+    workspaces,
+    sharedWorkspaces = [],
+    teamRole = null,
+    activeWorkspaceId,
+    projects,
+    tags,
+  }) {
     this.currentUser = { username };
     this.theme = theme ?? 'auto';
     this.weekStart = weekStart ?? 0;
     this.hour12 = hour12 ?? true;
     this.workspaces = AppStore.#sortByName(workspaces);
+    this.sharedWorkspaces = sharedWorkspaces;
+    this.teamRole = teamRole;
     this.currentWorkspaceId = activeWorkspaceId ?? workspaces[0]?.id ?? null;
     this.projects = AppStore.#sortByName(projects);
     this.tags = AppStore.#sortByName(tags);
@@ -219,6 +251,54 @@ export class AppStore {
     }
   }
 
+  /** Guard against mutating a read-only (shared) workspace. */
+  #assertWritable() {
+    if (this.readOnly) throw new Error('This workspace is read-only');
+  }
+
+  // --- teams & sharing -------------------------------------------------------
+  // Mostly thin pass-throughs to the repository. The Team modal holds the team
+  // roster locally and reloads via listTeams() after every mutation, so that
+  // call is the single point where we refresh the globally-needed bits:
+  // `teamRole` (gates the share toggle) and the manager's shared-with-me list.
+
+  get hasTeam() {
+    return this.teamRole != null;
+  }
+
+  async listTeams() {
+    const data = await this.#repo.listTeams();
+    const active = data.teams[0] ?? null;
+    this.teamRole = active ? active.role : null;
+    this.sharedWorkspaces =
+      this.teamRole === 'manager' ? await this.#repo.listSharedWorkspaces() : [];
+    return data;
+  }
+  createTeam(name) {
+    return this.#repo.createTeam(name);
+  }
+  inviteToTeam(teamId, username) {
+    return this.#repo.inviteToTeam(teamId, username);
+  }
+  acceptInvite(teamId) {
+    return this.#repo.acceptInvite(teamId);
+  }
+  leaveTeam(teamId) {
+    return this.#repo.leaveTeam(teamId);
+  }
+  removeTeamMember(teamId, userId) {
+    return this.#repo.removeTeamMember(teamId, userId);
+  }
+  deleteTeam(teamId) {
+    return this.#repo.deleteTeam(teamId);
+  }
+  /** Toggle whether an owned workspace is shared with the team (optimistic). */
+  setWorkspaceShared(workspaceId, shared) {
+    return this.#patch('workspaces', workspaceId, { shared }, (i) =>
+      this.#repo.setWorkspaceShared(i, shared),
+    );
+  }
+
   /** Serializable snapshot of a workspace (defaults to the current one). */
   exportWorkspace(id = this.currentWorkspaceId) {
     return this.#repo.exportWorkspace(id);
@@ -266,6 +346,7 @@ export class AppStore {
   }
 
   async create(data) {
+    this.#assertWritable();
     const entry = await this.#repo.createEntry({
       ...data,
       workspaceId: this.currentWorkspaceId,
@@ -294,12 +375,14 @@ export class AppStore {
   }
 
   update(id, patch) {
+    this.#assertWritable();
     return this.#patch('entries', id, patch, (i, p) =>
       this.#repo.updateEntry(i, p),
     );
   }
 
   async remove(id) {
+    this.#assertWritable();
     const prev = this.entries;
     this.entries = prev.filter((e) => e.id !== id);
     try {
@@ -318,6 +401,7 @@ export class AppStore {
   // --- projects --------------------------------------------------------------
 
   async addProject(data = {}) {
+    this.#assertWritable();
     const project = await this.#repo.createProject({
       ...data,
       workspaceId: this.currentWorkspaceId,
@@ -327,6 +411,7 @@ export class AppStore {
   }
 
   async updateProject(id, patch) {
+    this.#assertWritable();
     const saved = await this.#patch('projects', id, patch, (i, p) =>
       this.#repo.updateProject(i, p),
     );
@@ -335,6 +420,7 @@ export class AppStore {
   }
 
   async removeProject(id) {
+    this.#assertWritable();
     const prevProjects = this.projects;
     const prevEntries = this.entries;
     this.projects = prevProjects.filter((p) => p.id !== id);
@@ -354,6 +440,7 @@ export class AppStore {
   // --- tags (global, shared across all projects) -----------------------------
 
   async addTag(data = {}) {
+    this.#assertWritable();
     const tag = await this.#repo.createTag({
       ...data,
       workspaceId: this.currentWorkspaceId,
@@ -363,6 +450,7 @@ export class AppStore {
   }
 
   async updateTag(id, patch) {
+    this.#assertWritable();
     const saved = await this.#patch('tags', id, patch, (i, p) =>
       this.#repo.updateTag(i, p),
     );
@@ -371,6 +459,7 @@ export class AppStore {
   }
 
   async removeTag(id) {
+    this.#assertWritable();
     const prevTags = this.tags;
     const prevEntries = this.entries;
     this.tags = prevTags.filter((t) => t.id !== id);

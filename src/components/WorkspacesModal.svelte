@@ -3,10 +3,18 @@
   import Modal from '../lib/Modal.svelte';
   import Icon from '../lib/Icon.svelte';
 
-  /** Manage workspaces: create, rename, export, import and delete. */
+  /**
+   * Manage workspaces: create, rename, export, import and delete. When you're on
+   * a team, each workspace has a "Shared" toggle — on by default — controlling
+   * whether your team's manager can view it (read-only).
+   */
   let { onClose } = $props();
 
   let fileInput = $state();
+
+  // Sharing only matters for a regular member — the manager's own workspaces
+  // aren't viewable by anyone above them.
+  let canShare = $derived(store.teamRole === 'member');
 
   function renameWorkspace(w, value, el) {
     const name = value.trim();
@@ -57,6 +65,9 @@
 </script>
 
 <Modal title="Workspaces" {onClose}>
+  {#if canShare}
+    <p class="hint">Shared workspaces are visible (read-only) to your team's manager.</p>
+  {/if}
   <div class="list">
     {#each store.workspaces as w (w.id)}
       <div class="row">
@@ -67,6 +78,16 @@
           aria-label="Workspace name"
           onchange={(e) => renameWorkspace(w, e.currentTarget.value, e.currentTarget)}
         />
+        {#if canShare}
+          <label class="share" title="Share with your team">
+            <input
+              type="checkbox"
+              checked={w.shared}
+              onchange={(e) => store.setWorkspaceShared(w.id, e.currentTarget.checked)}
+            />
+            Shared
+          </label>
+        {/if}
         <button
           class="icon-btn"
           title="Export"
@@ -106,6 +127,12 @@
 </Modal>
 
 <style>
+  .hint {
+    margin: 0;
+    padding: var(--space-3) var(--space-5) 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
   .list {
     padding: var(--space-3) var(--space-5);
     overflow-y: auto;
@@ -122,6 +149,15 @@
     flex: 1;
     min-width: 0;
     height: 36px;
+  }
+  .share {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: none;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
   }
   .icon-btn {
     flex: none;

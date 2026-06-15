@@ -1,4 +1,10 @@
-import { listWorkspaces, listProjects, listTags } from '$lib/server/data.js';
+import {
+  listWorkspaces,
+  listProjects,
+  listTags,
+  listSharedWorkspaces,
+  getActiveTeamRole,
+} from '$lib/server/data.js';
 
 // The app is a client-rendered SPA (the timeline is interactive and its visible
 // range depends on the user's local timezone, which the server doesn't know).
@@ -14,10 +20,22 @@ export async function load({ locals, platform }) {
   const { user } = locals;
   const env = platform.env;
 
-  const workspaces = await listWorkspaces(env, user.id);
-  const activeWorkspaceId =
-    workspaces.find((w) => w.id === user.activeWorkspaceId)?.id ?? workspaces[0]?.id ?? null;
+  const [workspaces, sharedWorkspaces, teamRole] = await Promise.all([
+    listWorkspaces(env, user.id),
+    listSharedWorkspaces(env, user.id),
+    getActiveTeamRole(env, user.id),
+  ]);
 
+  // The active workspace may be an owned one or a workspace shared with the
+  // user (a manager's view); fall back to the first owned workspace.
+  const accessibleIds = new Set([...workspaces, ...sharedWorkspaces].map((w) => w.id));
+  const activeWorkspaceId = accessibleIds.has(user.activeWorkspaceId)
+    ? user.activeWorkspaceId
+    : workspaces[0]?.id ?? null;
+
+  // projects/tags are id-scoped; access to activeWorkspaceId was validated when
+  // it was set (see PUT /settings/active-workspace), so this is safe for shared
+  // workspaces too.
   const [projects, tags] = activeWorkspaceId
     ? await Promise.all([listProjects(env, activeWorkspaceId), listTags(env, activeWorkspaceId)])
     : [[], []];
@@ -28,6 +46,8 @@ export async function load({ locals, platform }) {
     weekStart: user.weekStart,
     hour12: user.hour12,
     workspaces,
+    sharedWorkspaces,
+    teamRole,
     activeWorkspaceId,
     projects,
     tags,

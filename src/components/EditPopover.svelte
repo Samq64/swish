@@ -16,6 +16,7 @@
     anchor = null,
     bounds = null,
     running = false,
+    readOnly = false,
     onChange,
     onCreateTag,
     onStop,
@@ -81,6 +82,7 @@
   }
 
   let assigned = $derived(new Set(entry.tagIds ?? []));
+  let assignedTags = $derived(tags.filter((t) => assigned.has(t.id)));
 
   function toggleTag(id) {
     const next = new Set(assigned);
@@ -129,8 +131,9 @@
   <input
     class="desc"
     type="text"
-    placeholder="Add description"
+    placeholder="(No description)"
     value={entry.description}
+    readonly={readOnly}
     oninput={(e) => onChange?.({ description: e.currentTarget.value })}
     use:autofocus={{ select: true }}
   />
@@ -143,6 +146,7 @@
         type="button"
         aria-haspopup="listbox"
         aria-expanded={projectOpen}
+        disabled={readOnly}
         onclick={() => (projectOpen = !projectOpen)}
       >
         <span class="dot" style:background={selectedProject?.color ?? 'var(--no-project)'}></span>
@@ -192,18 +196,29 @@
 
   <div class="field">
     <span class="label">Tags</span>
-    <TagCombobox
-      {tags}
-      selectedIds={entry.tagIds ?? []}
-      onToggle={toggleTag}
-      onCreate={createTag}
-    />
+    {#if readOnly}
+      {#if assignedTags.length}
+        <span class="ro-chips">
+          {#each assignedTags as t (t.id)}<span class="chip">{t.name}</span>{/each}
+        </span>
+      {:else}
+        <span class="ro-none">No tags</span>
+      {/if}
+    {:else}
+      <TagCombobox
+        {tags}
+        selectedIds={entry.tagIds ?? []}
+        onToggle={toggleTag}
+        onCreate={createTag}
+      />
+    {/if}
   </div>
 
   <div class="times">
     <input
       type="time"
       value={isoToTimeInput(entry.start)}
+      readonly={readOnly}
       onchange={(e) =>
         onChange?.({ start: timeInputToISO(e.currentTarget.value, entry.start) })}
     />
@@ -211,13 +226,16 @@
     <input
       type="time"
       value={entry.end ? isoToTimeInput(entry.end) : ''}
+      readonly={readOnly}
       onchange={(e) =>
         onChange?.({ end: timeInputToISO(e.currentTarget.value, entry.start) })}
     />
   </div>
 
   <div class="actions">
-    {#if running}
+    {#if readOnly}
+      <span class="ro-note">Read-only</span>
+    {:else if running}
       <button class="stop-btn" type="button" onclick={() => onStop?.()}>
         Stop
       </button>
@@ -226,7 +244,9 @@
         Delete
       </button>
     {/if}
-    <button class="done" type="button" onclick={() => onClose?.()}>Done</button>
+    <button class="done" type="button" onclick={() => onClose?.()}>
+      {readOnly ? 'Close' : 'Done'}
+    </button>
   </div>
 </div>
 
@@ -381,6 +401,28 @@
     height: 10px;
     flex: none;
     border-radius: 50%;
+  }
+  .ro-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .ro-chips .chip {
+    background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+    color: color-mix(in srgb, var(--accent) 75%, var(--text));
+    border-radius: 999px;
+    padding: 1px var(--space-2);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .ro-none {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .ro-note {
+    font-size: 12px;
+    color: var(--muted);
+    align-self: center;
   }
   .times {
     display: flex;

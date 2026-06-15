@@ -196,6 +196,7 @@
     projects={store.projects}
     tags={store.tags}
     pos={editorPos}
+    readOnly={store.readOnly}
     onCreateTag={(name) => store.addTag({ name })}
     onChange={(patch) => store.update(selectedEntry.id, patch)}
     onDelete={() => {

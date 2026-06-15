@@ -185,6 +185,7 @@
     {anchor}
     {bounds}
     running={selectedEntry.end === null}
+    readOnly={store.readOnly}
     onCreateTag={(name) => store.addTag({ name })}
     onChange={(patch) => store.update(selectedEntry.id, patch)}
     onStop={() => store.stop(selectedEntry.id)}

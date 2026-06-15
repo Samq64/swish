@@ -25,7 +25,7 @@
   <input
     class="search"
     type="text"
-    placeholder="Search or create a tag…"
+    placeholder={store.readOnly ? 'Search tags…' : 'Search or create a tag…'}
     bind:value={query}
   />
 
@@ -38,27 +38,34 @@
           type="text"
           value={t.name}
           placeholder="Tag name"
+          readonly={store.readOnly}
           oninput={(e) => store.updateTag(t.id, { name: e.currentTarget.value })}
         />
-        <button
-          class="delete"
-          aria-label="Delete {t.name}"
-          onclick={() => store.removeTag(t.id)}
-        >
-          <Icon name="trash-2" size={16} />
-        </button>
+        {#if !store.readOnly}
+          <button
+            class="delete"
+            aria-label="Delete {t.name}"
+            onclick={() => store.removeTag(t.id)}
+          >
+            <Icon name="trash-2" size={16} />
+          </button>
+        {/if}
       </div>
     {/each}
 
-    {#if query.trim() && !exact}
+    {#if query.trim() && !exact && !store.readOnly}
       <button class="create-option" onclick={createFromSearch}>
         <Icon name="plus" size={14} /> Create "#{query.trim()}"
       </button>
     {:else if filtered.length === 0}
       <p class="empty">
-        {store.tags.length === 0
-          ? 'Type a name above to create your first tag.'
-          : 'No matches.'}
+        {#if store.tags.length > 0}
+          No matches.
+        {:else if store.readOnly}
+          No tags.
+        {:else}
+          Type a name above to create your first tag.
+        {/if}
       </p>
     {/if}
   </div>

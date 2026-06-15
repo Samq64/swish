@@ -265,6 +265,108 @@ test('a second user cannot read or write the first user’s data', async () => {
   assert.equal(write.status, 403);
 });
 
+test("teams: the manager gets read-only access to members' shared workspaces by default", async () => {
+  const manager = await registerUser('manager', 'hunter2pw');
+  const emp = await registerUser('emp', 'hunter2pw');
+  const boss = await registerUser('boss', 'hunter2pw');
+
+  // emp owns two workspaces: the default + a second.
+  const empWs = (await api('GET', '/api/auth/me', { cookie: emp })).json.activeWorkspaceId;
+  const empSecond = (
+    await api('POST', '/api/workspaces', { cookie: emp, body: { name: 'Side' } })
+  ).json.id;
+
+  // Two managers create two teams.
+  const teamId = (await api('POST', '/api/teams', { cookie: manager, body: { name: 'Squad' } })).json.id;
+  const team2 = (await api('POST', '/api/teams', { cookie: boss, body: { name: 'Other' } })).json.id;
+
+  // A non-manager can't invite; the manager can. Both teams may invite emp while
+  // emp is on no team (multiple pending invites are allowed).
+  assert.equal(
+    (await api('POST', `/api/teams/${teamId}/invites`, { cookie: emp, body: { username: 'manager' } }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (await api('POST', `/api/teams/${teamId}/invites`, { cookie: manager, body: { username: 'emp' } }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await api('POST', `/api/teams/${team2}/invites`, { cookie: boss, body: { username: 'emp' } }))
+      .status,
+    200,
+  );
+
+  // Before accepting, nothing is visible to the manager.
+  assert.deepEqual((await api('GET', '/api/shared', { cookie: manager })).json, []);
+
+  // emp accepts one team; ALL of emp's workspaces become visible to that manager.
+  assert.equal((await api('POST', `/api/teams/${teamId}/accept`, { cookie: emp })).status, 200);
+  let shared = (await api('GET', '/api/shared', { cookie: manager })).json;
+  assert.deepEqual([...shared.map((w) => w.id)].sort(), [empWs, empSecond].sort());
+  assert.ok(shared.every((w) => w.ownerUsername === 'emp'));
+
+  // A regular member sees the team roster, including the manager.
+  const empTeam = (await api('GET', '/api/teams', { cookie: emp })).json.teams[0];
+  assert.equal(empTeam.role, 'member');
+  assert.ok(empTeam.members.some((mem) => mem.username === 'manager' && mem.role === 'manager'));
+
+  // One active team per user: emp can't accept (or be invited to) a second team.
+  assert.equal((await api('POST', `/api/teams/${team2}/accept`, { cookie: emp })).status, 409);
+  assert.equal(
+    (await api('POST', `/api/teams/${team2}/invites`, { cookie: boss, body: { username: 'emp' } }))
+      .status,
+    409,
+  );
+
+  // Read access works; writes are refused (read-only).
+  assert.equal(
+    (await api('GET', `/api/entries?workspaceId=${empWs}&from=${TODAY}&to=${TOMORROW}`, {
+      cookie: manager,
+    }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await api('POST', '/api/entries', { cookie: manager, body: { workspaceId: empWs, start: TODAY } }))
+      .status,
+    403,
+  );
+
+  // The owner hides one workspace; it vanishes from the manager's view and reads 403.
+  assert.equal(
+    (await api('PATCH', `/api/workspaces/${empSecond}`, { cookie: emp, body: { shared: false } }))
+      .status,
+    200,
+  );
+  shared = (await api('GET', '/api/shared', { cookie: manager })).json;
+  assert.deepEqual(
+    shared.map((w) => w.id),
+    [empWs],
+  );
+  assert.equal(
+    (await api('GET', `/api/entries?workspaceId=${empSecond}&from=${TODAY}&to=${TOMORROW}`, {
+      cookie: manager,
+    }))
+      .status,
+    403,
+  );
+
+  // A member can't delete the team; the manager can't leave (must delete instead).
+  assert.equal((await api('DELETE', `/api/teams/${teamId}`, { cookie: emp })).status, 403);
+  assert.equal((await api('POST', `/api/teams/${teamId}/leave`, { cookie: manager })).status, 404);
+
+  // emp leaves freely; the manager's shared list empties but emp keeps everything.
+  assert.equal((await api('POST', `/api/teams/${teamId}/leave`, { cookie: emp })).status, 204);
+  assert.deepEqual((await api('GET', '/api/shared', { cookie: manager })).json, []);
+  assert.ok((await api('GET', '/api/workspaces', { cookie: emp })).json.some((w) => w.id === empWs));
+
+  // Founder deletes the team; emp's data is untouched.
+  assert.equal((await api('DELETE', `/api/teams/${teamId}`, { cookie: manager })).status, 204);
+  assert.ok((await api('GET', '/api/workspaces', { cookie: emp })).json.length >= 1);
+});
+
 test('preferences default to auto/Sunday and can be updated', async () => {
   const me0 = await api('GET', '/api/auth/me', { cookie: alice });
   assert.equal(me0.json.theme, 'auto');

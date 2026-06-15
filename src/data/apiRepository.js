@@ -91,5 +91,20 @@ export function createApiRepository() {
     // --- export / import ---
     exportWorkspace: (workspaceId) => get(`/workspaces/${workspaceId}/export`),
     importWorkspace: (payload) => post('/workspaces/import', payload),
+
+    // --- teams ---
+    listTeams: () => get('/teams'),
+    createTeam: (name) => post('/teams', { name }),
+    inviteToTeam: (teamId, username) => post(`/teams/${teamId}/invites`, { username }),
+    acceptInvite: (teamId) => post(`/teams/${teamId}/accept`),
+    leaveTeam: (teamId) => post(`/teams/${teamId}/leave`),
+    removeTeamMember: (teamId, userId) => del(`/teams/${teamId}/members/${userId}`),
+    deleteTeam: (teamId) => del(`/teams/${teamId}`),
+
+    // --- workspace sharing ---
+    // Owner toggles whether a workspace is shared with their team (read-only).
+    setWorkspaceShared: (workspaceId, shared) => patch(`/workspaces/${workspaceId}`, { shared }),
+    // Workspaces shared with me, as a team manager.
+    listSharedWorkspaces: () => get('/shared'),
   };
 }

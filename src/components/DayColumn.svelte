@@ -189,6 +189,11 @@
 
   function beginCreate(event) {
     if (event.button != null && event.button !== 0) return;
+    // Read-only (a workspace shared with us): no creating; a tap clears selection.
+    if (store.readOnly) {
+      onSelect?.(null, event);
+      return;
+    }
     if (event.pointerType === 'touch') {
       // Hold to create; a finger-move first = scroll, a quick tap = dismiss.
       cancelLongPress();
@@ -227,6 +232,11 @@
   }
 
   function beginEntryDrag(entry, mode, event) {
+    // Read-only: a press selects the entry to view it, but never moves/resizes.
+    if (store.readOnly) {
+      onSelect?.(entry.id, event);
+      return;
+    }
     const b = toBlock(entry);
     const m = pointerMinutes(event);
     // Snapshot the current layout so neighbours stay put for the whole gesture.
