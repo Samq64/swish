@@ -104,18 +104,30 @@
       return;
     }
     let raf;
+    const measureRange = document.createRange();
     const tick = () => {
       const el = scrollEl.querySelector(`[data-entry-id="${id}"]`);
       if (el) {
         const r = el.getBoundingClientRect();
+        // Right edge of the actual text content (glyph-precise via a Range, so a
+        // full-width span doesn't read as full-width text). Lets the editor sit
+        // just past the information text in a wide day-view entry instead of
+        // covering it. Clamped to the block's own right edge.
+        let contentRight = r.left;
+        for (const t of el.querySelectorAll('.desc, .range, .elapsed, .tag')) {
+          measureRange.selectNodeContents(t);
+          contentRight = Math.max(contentRight, measureRange.getBoundingClientRect().right);
+        }
+        contentRight = Math.min(contentRight, r.right);
         if (
           !anchor ||
           anchor.left !== r.left ||
           anchor.top !== r.top ||
           anchor.width !== r.width ||
-          anchor.height !== r.height
+          anchor.height !== r.height ||
+          anchor.contentRight !== contentRight
         ) {
-          anchor = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+          anchor = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, contentRight };
         }
       }
 
@@ -133,7 +145,7 @@
   });
 </script>
 
-<div class="view">
+<div class="view fill-col">
   <div class="scroll" bind:this={scrollEl}>
     <!-- Day headers live INSIDE the scroller so they share the body's exact
          column widths (scrollbar included) and stay aligned; `sticky` keeps
@@ -199,10 +211,6 @@
 
 <style>
   .view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
     background: var(--surface);
   }
 

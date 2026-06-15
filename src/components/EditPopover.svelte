@@ -31,12 +31,14 @@
   let coords = $state(null);
 
   // Sit beside the selected entry (its on-screen rect = `anchor`) without ever
-  // covering it: prefer the right, flip left when the full width fits there,
-  // and when neither side fits, stay pinned to the entry's edge on the roomier
-  // side and run partially off-screen rather than overlap the entry. Vertically,
-  // align to the entry top but clamp inside `bounds` (the viewport minus the
-  // sticky header) so scrolling can't push the editor over the header UI.
-  // Re-runs as `anchor`/`bounds` follow the entry during drags and scrolls.
+  // covering its information text: prefer the right of the block, flip left when
+  // the full width fits there, then — for a block too wide to fit either side
+  // (a full-width day-view entry) — overlap its empty right area, sitting just
+  // past the text. Only when even that won't fit do we clamp to the roomier edge
+  // and run partially off-screen. Vertically, align to the entry top but clamp
+  // inside `bounds` (the viewport minus the sticky header) so scrolling can't
+  // push the editor over the header UI. Re-runs as `anchor`/`bounds` follow the
+  // entry during drags and scrolls.
   $effect(() => {
     if (!el || !anchor) return;
     const w = el.offsetWidth;
@@ -45,14 +47,23 @@
 
     const rightX = anchor.right + GAP;
     const leftX = anchor.left - GAP - w;
+    const contentX = (anchor.contentRight ?? anchor.left) + GAP;
     let x;
     if (rightX + w <= vw - MARGIN) {
-      x = rightX; // fits fully to the right
+      x = rightX; // fits fully to the right of the entry
     } else if (leftX >= MARGIN) {
-      x = leftX; // fits fully to the left
+      x = leftX; // fits fully to the left of the entry
+    } else if (contentX + w <= vw - MARGIN) {
+      // Wide entry (e.g. full-width day view): overlap the entry's empty right
+      // area, just past the information text so it stays readable.
+      x = contentX;
     } else {
-      // No full fit either side — overflow on the roomier side, off the entry.
-      x = vw - anchor.right >= anchor.left ? rightX : leftX;
+      // No fit anywhere — pick the roomier side and clamp to the viewport so the
+      // popover stays on-screen rather than running off the edge.
+      x =
+        vw - anchor.right >= anchor.left
+          ? Math.min(rightX, vw - MARGIN - w) // right side, clamped
+          : Math.max(leftX, MARGIN); // left side, clamped
     }
 
     const top = (bounds?.top ?? 0) + MARGIN;
@@ -159,7 +170,7 @@
       </button>
 
       {#if projectOpen}
-        <div class="dd-panel" role="listbox">
+        <div class="dd-panel dropdown-panel" role="listbox">
           <button
             class="option"
             class:current={!entry.projectId}
@@ -254,8 +265,7 @@
   .popover {
     position: fixed;
     z-index: 50;
-    width: 240px;
-    max-width: calc(100vw - 16px);
+    width: clamp(200px, calc(100vw - 80px), 240px);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -264,13 +274,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-  }
-  /* Narrower on phones so it leaves more of the timeline visible beside the
-     entry it's anchored to. */
-  @media (max-width: 640px) {
-    .popover {
-      width: 200px;
-    }
   }
   /* Underline-only field: opt out of the global boxed input look (no box, no
      fill, no focus ring) and keep the clean bottom rule. */
@@ -336,28 +339,12 @@
     color: var(--muted);
   }
   .caret {
-    display: inline-flex;
     flex: none;
-    color: var(--muted);
-    transition: transform 0.12s ease;
   }
-  .caret.open {
-    transform: rotate(180deg);
-  }
-
   .dd-panel {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    left: 0;
     right: 0;
-    z-index: 60;
     max-height: 220px;
     overflow-y: auto;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-    padding: var(--space-1);
   }
   .option {
     width: 100%;
