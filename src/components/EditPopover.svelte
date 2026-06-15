@@ -1,13 +1,14 @@
 <script>
+  import { untrack } from 'svelte';
   import { startOfDay, clamp } from '../lib/time.js';
   import { autofocus, clickOutside } from '../lib/actions.js';
   import Icon from '../lib/Icon.svelte';
   import TagCombobox from './TagCombobox.svelte';
 
   /**
-   * Small editor for a single entry. Emits granular patches via `onChange`
-   * so the store/repository sees the same shape of update regardless of which
-   * field changed.
+   * Small editor for a single entry. Edits are buffered locally and flushed as a
+   * single `onChange` patch when the editor closes (see `commit` below), so an
+   * editing session is one store/network update rather than one per field.
    */
   let {
     entry,
@@ -29,6 +30,40 @@
 
   let el = $state(null);
   let coords = $state(null);
+
+  // Every edit is buffered in `draft` and persisted as ONE update only when the
+  // editor closes (Done, switching entries, or unmount) — never per keystroke or
+  // per field. That collapses an editing session into a single network request
+  // and sidesteps the out-of-order PATCH races that made typing glitchy: nothing
+  // round-trips while you edit, so a stale echo can't revert the field. `draft`
+  // is the source of truth for every control here; the store (and the calendar)
+  // only see the change on close. Seeded once from `entry`; parents key the
+  // popover by entry id, so a fresh instance reseeds per entry and the close-time
+  // flush stays bound to the right entry even when switching.
+  const original = untrack(() => ({
+    description: entry.description ?? '',
+    projectId: entry.projectId ?? null,
+    tagIds: [...(entry.tagIds ?? [])],
+    start: entry.start,
+    end: entry.end,
+  }));
+  let draft = $state({ ...original });
+
+  let flushed = false;
+  const sameTags = (a, b) => a.length === b.length && a.every((id) => b.includes(id));
+  function commit() {
+    if (flushed) return; // close fires both Done's handler and the unmount cleanup
+    flushed = true;
+    const patch = {};
+    if (draft.description !== original.description) patch.description = draft.description;
+    if (draft.projectId !== original.projectId) patch.projectId = draft.projectId;
+    if (!sameTags(draft.tagIds, original.tagIds)) patch.tagIds = draft.tagIds;
+    if (draft.start !== original.start) patch.start = draft.start;
+    if (draft.end !== original.end) patch.end = draft.end;
+    if (Object.keys(patch).length) onChange?.(patch);
+  }
+  // Persist once when the editor closes or switches to another entry.
+  $effect(() => commit);
 
   // Sit beside the selected entry (its on-screen rect = `anchor`) without ever
   // covering its information text: prefer the right of the block, flip left when
@@ -74,7 +109,7 @@
 
   let projectOpen = $state(false);
   let selectedProject = $derived(
-    entry.projectId ? (projects.find((p) => p.id === entry.projectId) ?? null) : null,
+    draft.projectId ? (projects.find((p) => p.id === draft.projectId) ?? null) : null,
   );
   // The whole editor takes on the entry's project colour: we override `--accent`
   // on the root so every control inside — the description underline, the project
@@ -88,27 +123,29 @@
   );
 
   function pickProject(id) {
-    onChange?.({ projectId: id });
+    draft.projectId = id;
     projectOpen = false;
   }
 
-  let assigned = $derived(new Set(entry.tagIds ?? []));
+  let assigned = $derived(new Set(draft.tagIds));
   let assignedTags = $derived(tags.filter((t) => assigned.has(t.id)));
 
   function toggleTag(id) {
-    const next = new Set(assigned);
-    next.has(id) ? next.delete(id) : next.add(id);
-    onChange?.({ tagIds: [...next] });
+    draft.tagIds = assigned.has(id)
+      ? draft.tagIds.filter((t) => t !== id)
+      : [...draft.tagIds, id];
   }
 
   async function createTag(name) {
     // Reuse an existing tag with the same name (case-insensitive) if present.
+    // A genuinely new tag must be created server-side now to obtain its id; only
+    // its assignment to this entry is deferred to close like every other edit.
     const existing = tags.find(
       (t) => t.name.toLowerCase() === name.toLowerCase(),
     );
     const tag = existing ?? (await onCreateTag?.(name));
     if (tag && !assigned.has(tag.id)) {
-      onChange?.({ tagIds: [...assigned, tag.id] });
+      draft.tagIds = [...draft.tagIds, tag.id];
     }
     return tag;
   }
@@ -143,9 +180,8 @@
     class="desc"
     type="text"
     placeholder="(No description)"
-    value={entry.description}
+    bind:value={draft.description}
     readonly={readOnly}
-    oninput={(e) => onChange?.({ description: e.currentTarget.value })}
     use:autofocus={{ select: true }}
   />
 
@@ -173,19 +209,19 @@
         <div class="dd-panel dropdown-panel" role="listbox">
           <button
             class="option"
-            class:current={!entry.projectId}
+            class:current={!draft.projectId}
             role="option"
-            aria-selected={!entry.projectId}
+            aria-selected={!draft.projectId}
             onclick={() => pickProject(null)}
           >
             <span class="check">
-              {#if !entry.projectId}<Icon name="check" size={14} />{/if}
+              {#if !draft.projectId}<Icon name="check" size={14} />{/if}
             </span>
             <span class="dot" style:background="var(--no-project)"></span>
             <span class="opt-name none">No project</span>
           </button>
           {#each projects as p (p.id)}
-            {@const isCurrent = p.id === entry.projectId}
+            {@const isCurrent = p.id === draft.projectId}
             <button
               class="option"
               class:current={isCurrent}
@@ -218,7 +254,7 @@
     {:else}
       <TagCombobox
         {tags}
-        selectedIds={entry.tagIds ?? []}
+        selectedIds={draft.tagIds}
         onToggle={toggleTag}
         onCreate={createTag}
       />
@@ -228,18 +264,18 @@
   <div class="times">
     <input
       type="time"
-      value={isoToTimeInput(entry.start)}
+      value={isoToTimeInput(draft.start)}
       readonly={readOnly}
       onchange={(e) =>
-        onChange?.({ start: timeInputToISO(e.currentTarget.value, entry.start) })}
+        (draft.start = timeInputToISO(e.currentTarget.value, draft.start))}
     />
     <span>–</span>
     <input
       type="time"
-      value={entry.end ? isoToTimeInput(entry.end) : ''}
+      value={draft.end ? isoToTimeInput(draft.end) : ''}
       readonly={readOnly}
       onchange={(e) =>
-        onChange?.({ end: timeInputToISO(e.currentTarget.value, entry.start) })}
+        (draft.end = timeInputToISO(e.currentTarget.value, draft.start))}
     />
   </div>
 
@@ -251,11 +287,18 @@
         Stop
       </button>
     {:else}
-      <button class="delete" type="button" onclick={() => onDelete?.()}>
+      <button
+        class="delete"
+        type="button"
+        onclick={() => {
+          flushed = true; // the entry is going away — don't persist buffered edits
+          onDelete?.();
+        }}
+      >
         Delete
       </button>
     {/if}
-    <button class="done" type="button" onclick={() => onClose?.()}>
+    <button class="done" type="button" onclick={() => { commit(); onClose?.(); }}>
       {readOnly ? 'Close' : 'Done'}
     </button>
   </div>
@@ -414,6 +457,19 @@
     align-items: center;
     gap: var(--space-2);
     font-size: 13px;
+  }
+  /* Two native time inputs (each with an AM/PM segment + picker icon) plus the
+     dash are wider than the popover at their intrinsic size, so the end input
+     used to spill past the right edge. Let them share the row equally and shrink
+     to fit; tighter side padding keeps the glyphs and picker icon readable. */
+  .times input {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    font-size: 13px;
+  }
+  .times span {
+    flex: none;
   }
   .actions {
     display: flex;

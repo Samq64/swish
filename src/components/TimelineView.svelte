@@ -190,23 +190,29 @@
 </div>
 
 {#if selectedEntry}
-  <EditPopover
-    entry={selectedEntry}
-    projects={store.projects}
-    tags={store.tags}
-    {anchor}
-    {bounds}
-    running={selectedEntry.end === null}
-    readOnly={store.readOnly}
-    onCreateTag={(name) => store.addTag({ name })}
-    onChange={(patch) => store.update(selectedEntry.id, patch)}
-    onStop={() => store.stop(selectedEntry.id)}
-    onDelete={() => {
-      store.remove(selectedEntry.id);
-      selectedId = null;
-    }}
-    onClose={() => (selectedId = null)}
-  />
+  {@const sid = selectedEntry.id}
+  <!-- Keyed by entry id so each selection gets a fresh editor instance: its
+       callbacks stay bound to `sid`, so a pending description edit flushed as the
+       editor tears down still targets the entry it was editing, not the new one. -->
+  {#key sid}
+    <EditPopover
+      entry={selectedEntry}
+      projects={store.projects}
+      tags={store.tags}
+      {anchor}
+      {bounds}
+      running={selectedEntry.end === null}
+      readOnly={store.readOnly}
+      onCreateTag={(name) => store.addTag({ name })}
+      onChange={(patch) => store.update(sid, patch)}
+      onStop={() => store.stop(sid)}
+      onDelete={() => {
+        store.remove(sid);
+        selectedId = null;
+      }}
+      onClose={() => (selectedId = null)}
+    />
+  {/key}
 {/if}
 
 <style>

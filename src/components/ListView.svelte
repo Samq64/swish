@@ -1,11 +1,6 @@
 <script>
   import { store } from '../data/store.js';
-  import {
-    formatClock,
-    formatDuration,
-    dateToMinutes,
-    clamp,
-  } from '../lib/time.js';
+  import { formatClock, formatDuration, dateToMinutes } from '../lib/time.js';
   import { entryProject, entryTagNames, entryDurationMin } from '../lib/entries.js';
   import EditPopover from './EditPopover.svelte';
 
@@ -17,7 +12,10 @@
   const NO_PROJECT = '__none__';
 
   let selectedId = $state(null);
-  let editorPos = $state({ x: 0, y: 0 });
+  // The clicked row's rect, in the `anchor` shape EditPopover positions against
+  // (it has no `pos` prop). `bounds` is the on-screen region the editor may fill.
+  let anchor = $state(null);
+  let bounds = $state(null);
   /** @type {Set<string>} */
   let filterTagIds = $state(new Set());
   /** @type {Set<string>} project ids; NO_PROJECT matches entries with none. */
@@ -80,9 +78,22 @@
 
   function select(id, event) {
     selectedId = id;
-    const x = clamp((event?.clientX ?? 200) + 12, 8, window.innerWidth - 260);
-    const y = clamp((event?.clientY ?? 120) - 10, 8, window.innerHeight - 320);
-    editorPos = { x, y };
+    // Anchor the editor to a thin vertical strip at the cursor X spanning the
+    // clicked row, so it opens just beside the pointer (rows are full-width, so a
+    // row-rect anchor would push it off-screen). EditPopover handles the rest:
+    // right of the cursor when it fits, flip left otherwise, clamped on-screen.
+    const row = event?.currentTarget?.getBoundingClientRect();
+    const x = event?.clientX ?? (row ? row.left : 200);
+    anchor = {
+      left: x,
+      right: x,
+      top: row?.top ?? 120,
+      bottom: row?.bottom ?? 120,
+      width: 0,
+      height: row?.height ?? 0,
+      contentRight: x,
+    };
+    bounds = { top: 8, bottom: window.innerHeight - 8 };
   }
 </script>
 
@@ -191,20 +202,26 @@
 </div>
 
 {#if selectedEntry}
-  <EditPopover
-    entry={selectedEntry}
-    projects={store.projects}
-    tags={store.tags}
-    pos={editorPos}
-    readOnly={store.readOnly}
-    onCreateTag={(name) => store.addTag({ name })}
-    onChange={(patch) => store.update(selectedEntry.id, patch)}
-    onDelete={() => {
-      store.remove(selectedEntry.id);
-      selectedId = null;
-    }}
-    onClose={() => (selectedId = null)}
-  />
+  {@const sid = selectedEntry.id}
+  <!-- Keyed by entry id (see TimelineView): keeps the callbacks bound to `sid`
+       so a flushed description edit targets the entry the editor was editing. -->
+  {#key sid}
+    <EditPopover
+      entry={selectedEntry}
+      projects={store.projects}
+      tags={store.tags}
+      {anchor}
+      {bounds}
+      readOnly={store.readOnly}
+      onCreateTag={(name) => store.addTag({ name })}
+      onChange={(patch) => store.update(sid, patch)}
+      onDelete={() => {
+        store.remove(sid);
+        selectedId = null;
+      }}
+      onClose={() => (selectedId = null)}
+    />
+  {/key}
 {/if}
 
 <style>
