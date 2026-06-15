@@ -41,6 +41,9 @@ export class AppStore {
   /** Reference day the view is built around (ISO, start of day). */
   anchor = $state(startOfDay(new Date()).toISOString());
   loading = $state(false);
+  /** The from/to that the current `entries` array was loaded for. */
+  loadedRangeStart = $state(null);
+  loadedRangeEnd = $state(null);
 
   #repo;
 
@@ -63,6 +66,20 @@ export class AppStore {
   get rangeEnd() {
     const last = this.visibleDays[this.visibleDays.length - 1];
     return addDays(last, 1).toISOString();
+  }
+
+  /**
+   * The window actually fetched from the repository. It always spans the
+   * anchor's whole week — even in day view, which only *displays* one column —
+   * so it never depends on `view`. That's deliberate: switching day↔week↔list
+   * leaves the fetch window unchanged, so no reload is needed and the entries
+   * (and the tracked-time total) never flash on a view switch.
+   */
+  get fetchStart() {
+    return startOfWeek(this.anchor, this.weekStart).toISOString();
+  }
+  get fetchEnd() {
+    return addDays(startOfWeek(this.anchor, this.weekStart), 7).toISOString();
   }
 
   /** Map of projectId -> project, for quick lookups in the UI. */
@@ -203,17 +220,29 @@ export class AppStore {
     ]);
     this.projects = AppStore.#sortByName(projects);
     this.tags = AppStore.#sortByName(tags);
+    // The entries belong to the previous workspace; force a refetch (the range
+    // guard in loadRange would otherwise skip an unchanged week).
+    this.loadedRangeStart = null;
+    this.loadedRangeEnd = null;
     await this.loadRange();
   }
 
   async loadRange() {
+    const from = this.fetchStart;
+    const to = this.fetchEnd;
+    // Already have this exact week loaded — nothing to fetch. This is what makes
+    // a view switch (day↔week↔list) free: the fetch window doesn't change, so we
+    // return immediately and the total/entries never flash.
+    if (from === this.loadedRangeStart && to === this.loadedRangeEnd) return;
     this.loading = true;
     try {
       this.entries = await this.#repo.listEntries({
-        from: this.rangeStart,
-        to: this.rangeEnd,
+        from,
+        to,
         workspaceId: this.currentWorkspaceId,
       });
+      this.loadedRangeStart = from;
+      this.loadedRangeEnd = to;
     } finally {
       this.loading = false;
     }
@@ -314,8 +343,9 @@ export class AppStore {
 
   setView(view) {
     if (view === this.view) return;
+    // Pure display change: every view reads from the same already-loaded week,
+    // so there's no fetch (and thus no flash) when toggling day/week/list.
     this.view = view;
-    return this.loadRange();
   }
 
   /** Step forward/back by one view-unit (a day, or a week for week/list). */

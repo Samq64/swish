@@ -74,11 +74,34 @@
   );
 
   // Total tracked minutes across the visible range (completed entries only).
-  let totalMin = $derived(
-    store.entries
-      .filter((e) => e.end)
-      .reduce((sum, e) => sum + entryDurationMin(e), 0),
-  );
+  // `stableTotalMin` is the last value computed from a fully-loaded range so we
+  // can fall back to it while a new range is loading (avoids the flash of a
+  // wrong intermediate total when the view range expands, e.g. day → week).
+  let stableTotalMin = $state(0);
+
+  let totalMin = $derived.by(() => {
+    const from = new Date(store.rangeStart).getTime();
+    const to = new Date(store.rangeEnd).getTime();
+    // Entries cover the visible range only when the loaded range is at least as
+    // wide. If they're stale (loaded for a narrower range), fall back to the
+    // last stable value so we don't briefly show a too-small total.
+    const covered =
+      store.loadedRangeStart !== null &&
+      new Date(store.loadedRangeStart).getTime() <= from &&
+      new Date(store.loadedRangeEnd).getTime() >= to;
+    if (!covered) return stableTotalMin;
+    return store.entries
+      .filter((e) => {
+        if (!e.end) return false;
+        const t = new Date(e.start).getTime();
+        return t >= from && t < to;
+      })
+      .reduce((sum, e) => sum + entryDurationMin(e), 0);
+  });
+
+  $effect(() => {
+    if (!store.loading) stableTotalMin = totalMin;
+  });
 </script>
 
 <svelte:head>
