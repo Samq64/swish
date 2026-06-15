@@ -81,7 +81,7 @@
 <Modal title="Team" width={520} {onClose}>
   <div class="body">
     {#if loading}
-      <p class="empty">Loading…</p>
+      <p class="empty-state">Loading…</p>
     {:else}
       {#if invites.length}
         <section>
@@ -158,7 +158,7 @@
       {/each}
 
       {#if !teams.length && !invites.length}
-        <p class="empty">
+        <p class="empty-state">
           You're not on a team yet. Create one below to start sharing.
           <br />
           Waiting on an invite? Reopen this window to check for new ones.
@@ -333,12 +333,6 @@
     flex: 1;
     min-width: 0;
     height: 36px;
-  }
-  .empty {
-    color: var(--muted);
-    font-size: 13px;
-    text-align: center;
-    padding: var(--space-4) 0;
   }
   .note {
     margin: 0;

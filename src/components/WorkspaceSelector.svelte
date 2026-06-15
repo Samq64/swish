@@ -51,7 +51,7 @@
   </button>
 
   {#if open}
-    <div class="panel">
+    <div class="panel dropdown-panel">
       <div class="panel-label">My workspaces</div>
       <div class="options">
         {#each store.workspaces as w (w.id)}
@@ -138,25 +138,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .caret {
-    display: inline-flex;
-    color: var(--muted);
-    transition: transform 0.12s ease;
-  }
-  .caret.open {
-    transform: rotate(180deg);
-  }
-
   .panel {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    left: 0;
     z-index: 80;
     width: 240px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
     padding: var(--space-2);
   }
   .panel-label {

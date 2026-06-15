@@ -129,6 +129,7 @@
     border-radius: var(--radius);
     padding: var(--space-2) var(--space-4);
     font-weight: 600;
+    line-height: 1;
     color: white;
     background: var(--accent);
   }

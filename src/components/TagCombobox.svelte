@@ -50,7 +50,7 @@
   </button>
 
   {#if open}
-    <div class="panel">
+    <div class="panel dropdown-panel">
       <input
         class="search"
         type="text"
@@ -135,26 +135,10 @@
     color: var(--muted);
     font-size: 14px;
   }
-  .caret {
-    display: inline-flex;
-    color: var(--muted);
-    transition: transform 0.12s ease;
-  }
-  .caret.open {
-    transform: rotate(180deg);
-  }
-
   .panel {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    left: 0;
     right: 0;
-    z-index: 60;
-    background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-    padding: var(--space-1);
   }
   .search {
     width: 100%;

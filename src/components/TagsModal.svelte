@@ -43,7 +43,7 @@
         />
         {#if !store.readOnly}
           <button
-            class="delete"
+            class="delete-btn"
             aria-label="Delete {t.name}"
             onclick={() => store.removeTag(t.id)}
           >
@@ -58,7 +58,7 @@
         <Icon name="plus" size={14} /> Create "#{query.trim()}"
       </button>
     {:else if filtered.length === 0}
-      <p class="empty">
+      <p class="empty-state">
         {#if store.tags.length > 0}
           No matches.
         {:else if store.readOnly}
@@ -102,37 +102,5 @@
   .name {
     flex: 1;
     min-width: 0;
-  }
-  .delete {
-    display: inline-flex;
-    align-items: center;
-    border: none;
-    background: none;
-    color: #d63031;
-    flex: none;
-    padding: var(--space-1);
-  }
-  .create-option {
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    border: none;
-    background: none;
-    color: var(--accent);
-    font-size: 13px;
-    font-weight: 600;
-    padding: var(--space-2) var(--space-1);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-  }
-  .create-option:hover {
-    background: var(--bg);
-  }
-  .empty {
-    color: var(--muted);
-    font-size: 13px;
-    text-align: center;
-    padding: var(--space-4) 0;
   }
 </style>
