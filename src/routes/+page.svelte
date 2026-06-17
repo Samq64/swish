@@ -4,16 +4,46 @@
   import { store } from '../data/store.js';
   import { formatDuration } from '../lib/time.js';
   import { entryDurationMin } from '../lib/entries.js';
+  import { clickOutside } from '../lib/actions.js';
   import Icon from '../lib/Icon.svelte';
   import TimerBar from '../components/TimerBar.svelte';
   import WorkspaceSelector from '../components/WorkspaceSelector.svelte';
   import TimelineView from '../components/TimelineView.svelte';
   import ListView from '../components/ListView.svelte';
+  import ReportsView from '../components/ReportsView.svelte';
   import ProjectsModal from '../components/ProjectsModal.svelte';
   import TagsModal from '../components/TagsModal.svelte';
   import SettingsModal from '../components/SettingsModal.svelte';
   import WorkspacesModal from '../components/WorkspacesModal.svelte';
   import TeamModal from '../components/TeamModal.svelte';
+
+  // Report range presets shown in the header for the reports view (kept lean —
+  // arbitrary windows are covered by Custom). State lives on the store so the
+  // charts in ReportsView read the same range this picker sets.
+  const REPORT_PRESETS = [
+    { key: 'week', label: 'Week' },
+    { key: 'month', label: 'Month' },
+    { key: 'year', label: 'Year' },
+    { key: 'custom', label: 'Custom' },
+  ];
+  let rangeOpen = $state(false);
+  let reportPresetLabel = $derived(
+    REPORT_PRESETS.find((p) => p.key === store.reportPreset)?.label ?? 'Range',
+  );
+
+  // The visible date range for the reports view, mirroring the timeline's range
+  // label. Shown for the fixed presets; Custom shows its own date pickers instead.
+  let reportRangeLabel = $derived.by(() => {
+    const { from, to } = store.reportRange;
+    if (store.reportPreset === 'year') return String(from.getFullYear());
+    if (store.reportPreset === 'month')
+      return from.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const last = new Date(to.getTime() - 1); // inclusive last day
+    const mo = (d) => d.toLocaleDateString(undefined, { month: 'short' });
+    return from.getMonth() === last.getMonth()
+      ? `${mo(from)} ${from.getDate()} – ${last.getDate()}`
+      : `${mo(from)} ${from.getDate()} – ${mo(last)} ${last.getDate()}`;
+  });
 
   let { data } = $props();
   // One-time seed from the server load; intentionally reads the initial `data`
@@ -134,32 +164,100 @@
 </header>
 
 <nav class="day-nav">
-  <div class="nav-left">
-    <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
-      <Icon name="chevron-left" />
-    </button>
-    <input
-      class="date-input"
-      type="date"
-      aria-label="Go to date"
-      value={anchorInput}
-      onchange={(e) => pickDate(e.currentTarget.value)}
-    />
-    <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
-      <Icon name="chevron-right" />
-    </button>
+  <!-- Reports has its own range, so the timeline's date controls and week total
+       don't apply; a range dropdown (+ date pickers when Custom) takes their place. -->
+  {#if store.view === 'reports'}
+    <div class="nav-left">
+      <span class="control-label" id="range-label">Range</span>
+      <div class="range-picker" use:clickOutside={() => (rangeOpen = false)}>
+        <button
+          class="range-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={rangeOpen}
+          aria-labelledby="range-label"
+          onclick={() => (rangeOpen = !rangeOpen)}
+        >
+          <span>{reportPresetLabel}</span>
+          <span class="caret" class:open={rangeOpen}><Icon name="chevron-down" size={16} /></span>
+        </button>
 
-    {#if store.view !== 'day'}
-      <h2 class="range-label">{rangeLabel}</h2>
-    {/if}
-    <span class="total">{formatDuration(totalMin)} tracked</span>
-  </div>
+        {#if rangeOpen}
+          <div class="range-panel dropdown-panel" role="listbox" aria-labelledby="range-label">
+            {#each REPORT_PRESETS as p (p.key)}
+              {@const current = store.reportPreset === p.key}
+              <button
+                class="range-option"
+                class:current
+                role="option"
+                aria-selected={current}
+                onclick={() => {
+                  store.reportPreset = p.key;
+                  rangeOpen = false;
+                }}
+              >
+                <span class="check">{#if current}<Icon name="check" size={14} />{/if}</span>
+                {p.label}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Always rendered (width-collapsed off-custom) so the row reserves the
+           date inputs' native height and switching to Custom doesn't shift the
+           layout — the inputs are taller than the trigger by a couple of pixels. -->
+      <div class="custom-range" class:reserved={store.reportPreset !== 'custom'}>
+        <input
+          class="date-input"
+          type="date"
+          aria-label="From date"
+          max={store.reportTo}
+          value={store.reportFrom}
+          onchange={(e) => (store.reportFrom = e.currentTarget.value || store.reportFrom)}
+        />
+        <span class="dash">–</span>
+        <input
+          class="date-input"
+          type="date"
+          aria-label="To date"
+          min={store.reportFrom}
+          value={store.reportTo}
+          onchange={(e) => (store.reportTo = e.currentTarget.value || store.reportTo)}
+        />
+      </div>
+
+      {#if store.reportPreset !== 'custom'}
+        <h2 class="range-label">{reportRangeLabel}</h2>
+      {/if}
+    </div>
+  {:else}
+    <div class="nav-left">
+      <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
+        <Icon name="chevron-left" />
+      </button>
+      <input
+        class="date-input"
+        type="date"
+        aria-label="Go to date"
+        value={anchorInput}
+        onchange={(e) => pickDate(e.currentTarget.value)}
+      />
+      <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
+        <Icon name="chevron-right" />
+      </button>
+
+      {#if store.view !== 'day'}
+        <h2 class="range-label">{rangeLabel}</h2>
+      {/if}
+      <span class="total">{formatDuration(totalMin)} tracked</span>
+    </div>
+  {/if}
 
   <div
     class="seg"
     role="group"
     aria-label="View"
-    style="--seg-active: {store.view === 'week' ? 0 : store.view === 'day' ? 1 : 2}; --seg-count: 3"
+    style="--seg-active: {store.view === 'week' ? 0 : store.view === 'day' ? 1 : store.view === 'list' ? 2 : 3}; --seg-count: 4"
   >
     <button
       class:active={store.view === 'week'}
@@ -176,6 +274,12 @@
     >
       List
     </button>
+    <button
+      class:active={store.view === 'reports'}
+      onclick={() => store.setView('reports')}
+    >
+      Reports
+    </button>
   </div>
 </nav>
 
@@ -184,6 +288,8 @@
     <div class="fill-col view-layer" in:fade={{ duration: 160 }} out:fade={{ duration: 160 }}>
       {#if store.view === 'list'}
         <ListView />
+      {:else if store.view === 'reports'}
+        <ReportsView />
       {:else}
         <TimelineView />
       {/if}
@@ -310,6 +416,83 @@
 
   .seg {
     flex: none;
+  }
+
+  .control-label {
+    font-size: 13px;
+    color: var(--muted);
+    flex: none;
+  }
+  /* Range dropdown — mirrors the WorkspaceSelector pattern (trigger + caret +
+     .dropdown-panel of options) so it matches the app's other dropdowns. */
+  .range-picker {
+    position: relative;
+    flex: none;
+  }
+  .range-trigger {
+    display: inline-flex;
+    align-items: center;
+    /* Fixed width (caret pinned right via space-between) so the trigger doesn't
+       resize as the label changes between Week/Month/Year/Custom — no shift. */
+    justify-content: space-between;
+    width: 120px;
+    gap: var(--space-2);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 6px var(--space-3);
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .range-trigger:hover {
+    background: var(--bg);
+  }
+  .range-panel {
+    z-index: 80;
+    min-width: 160px;
+    padding: var(--space-1);
+  }
+  .range-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    font: inherit;
+    color: inherit;
+  }
+  .range-option:hover {
+    background: var(--bg);
+  }
+  .range-option.current {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+  .range-option .check {
+    width: 14px;
+    flex: none;
+    text-align: center;
+    color: var(--accent);
+  }
+  .custom-range {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* Off-custom: keep the inputs (so the row keeps their height) but take no
+     width and stay hidden. The leftover flex gap is absorbed by the nav's
+     space-between whitespace, so nothing visible remains. */
+  .custom-range.reserved {
+    width: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+  .custom-range .dash {
+    color: var(--muted);
   }
 
   .view-host {

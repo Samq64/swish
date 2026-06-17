@@ -74,6 +74,19 @@ export function minutesToISO(day, minutes) {
   return base.toISOString();
 }
 
+/** Local calendar day of a Date/ISO as "YYYY-MM-DD" (for <input type=date>; no UTC shift). */
+export function toDateInput(value) {
+  const d = new Date(value);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Parse an <input type=date> "YYYY-MM-DD" as a local start-of-day Date. */
+export function fromDateInput(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /** Whether two ISO/Date values fall on the same calendar day. */
 export function isSameDay(a, b) {
   const da = new Date(a);

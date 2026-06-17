@@ -1,4 +1,9 @@
-import { startOfDay, startOfWeek, addDays } from '../lib/time.js';
+import { startOfDay, startOfWeek, addDays, fromDateInput, toDateInput } from '../lib/time.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Past this many days a day-bucketed report chart has too many bars to read, so
+// it switches to monthly buckets (matches the Year preset's granularity).
+const REPORT_MONTH_BUCKET_THRESHOLD = 62;
 
 /**
  * Reactive application state, built on Svelte 5 runes. It is the only thing
@@ -36,10 +41,19 @@ export class AppStore {
   weekStart = $state(0);
   /** Clock format: true = 12-hour (AM/PM), false = 24-hour. */
   hour12 = $state(true);
-  /** 'week' | 'day' | 'list' */
+  /** 'week' | 'day' | 'list' | 'reports' */
   view = $state('week');
   /** Reference day the view is built around (ISO, start of day). */
   anchor = $state(startOfDay(new Date()).toISOString());
+  /**
+   * Reports view range. Lives here (not in ReportsView) because the preset
+   * picker renders up in the page header while the charts render in the view
+   * body — siblings that both need the same range. 'week' | 'month' | 'year' |
+   * 'custom'; the custom bounds are inclusive local days (YYYY-MM-DD).
+   */
+  reportPreset = $state('week');
+  reportFrom = $state(toDateInput(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  reportTo = $state(toDateInput(new Date()));
   loading = $state(false);
   /** The from/to that the current `entries` array was loaded for. */
   loadedRangeStart = $state(null);
@@ -108,6 +122,38 @@ export class AppStore {
   /** The currently running entry (open-ended), if any. */
   runningEntry = $derived(this.entries.find((e) => e.end === null) ?? null);
 
+  /**
+   * The concrete window the reports view covers, derived from `reportPreset`
+   * (and the custom bounds): `{ from, to (exclusive), unit }` where `unit` is the
+   * chart's bucket granularity ('day' | 'month'). Lives here so both the header
+   * (range label + picker) and the ReportsView charts read one source of truth.
+   */
+  reportRange = $derived.by(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const mo = now.getMonth();
+    switch (this.reportPreset) {
+      case 'month':
+        return { from: new Date(y, mo, 1), to: new Date(y, mo + 1, 1), unit: 'day' };
+      case 'year':
+        return { from: new Date(y, 0, 1), to: new Date(y + 1, 0, 1), unit: 'month' };
+      case 'custom': {
+        const from = fromDateInput(this.reportFrom);
+        // The picked end day is inclusive, so the exclusive bound is the day after.
+        // Guard an inverted range (to before from) by collapsing to a single day.
+        const end = fromDateInput(this.reportTo);
+        const to = addDays(end >= from ? end : from, 1);
+        const span = Math.round((to - from) / DAY_MS);
+        return { from, to, unit: span > REPORT_MONTH_BUCKET_THRESHOLD ? 'month' : 'day' };
+      }
+      case 'week':
+      default: {
+        const from = startOfWeek(now, this.weekStart);
+        return { from, to: addDays(from, 7), unit: 'day' };
+      }
+    }
+  });
+
   static #sortByName(arr) {
     return [...arr].sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -143,6 +189,9 @@ export class AppStore {
     this.projects = AppStore.#sortByName(projects);
     this.tags = AppStore.#sortByName(tags);
     this.ready = true;
+    // A read-only (shared) workspace has no editing affordances, so open on the
+    // reports view — the one thing a manager actually wants to look at there.
+    if (this.readOnly) this.view = 'reports';
     return this.loadRange();
   }
 
@@ -248,11 +297,29 @@ export class AppStore {
     }
   }
 
+  /**
+   * Fetch entries for an arbitrary range from the current workspace *without*
+   * touching the timeline's loaded `entries`. The reports view picks its own
+   * range (a month, a year) independent of the day/week the timeline shows, so
+   * it can't reuse `loadRange`/`entries`. Read-only: it returns the rows for the
+   * caller to aggregate, leaving the store's own state alone.
+   * @param {{ from: string, to: string }} range ISO bounds (from inclusive, to exclusive).
+   */
+  queryEntries({ from, to }) {
+    return this.#repo.listEntries({
+      from,
+      to,
+      workspaceId: this.currentWorkspaceId,
+    });
+  }
+
   async switchWorkspace(id) {
     if (id === this.currentWorkspaceId) return;
     this.currentWorkspaceId = id;
     await this.#repo.setActiveWorkspaceId(id);
     await this.loadWorkspaceData();
+    // Landing on a shared (read-only) workspace: default to reports (see hydrate).
+    if (this.readOnly) this.view = 'reports';
   }
 
   async addWorkspace(name) {
