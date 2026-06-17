@@ -10,9 +10,32 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Time Tracker" />
+    <style>
+      /* Shown by default; hidden only once we confirm a Baseline-2024 browser.
+         Browsers too old for light-dark() — or even for @supports — keep it
+         visible, so they get a message instead of the SPA's blank page. */
+      #legacy-browser {
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+        background: #fde8e8;
+        color: #1a1a1a;
+      }
+      @supports (color: light-dark(#000, #fff)) {
+        #legacy-browser {
+          display: none;
+        }
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body>
+    <p id="legacy-browser">
+      This app needs an up-to-date browser — please update to the latest Chrome, Edge, Firefox, or
+      Safari.
+    </p>
+    <noscript>This app requires JavaScript.</noscript>
     <div id="app">%sveltekit.body%</div>
   </body>
 </html>
