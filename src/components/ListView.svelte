@@ -43,8 +43,8 @@
 
   // Day groups, newest first, omitting empty days.
   let groups = $derived.by(() => {
-    return [...store.visibleDays]
-      .reverse()
+    return store.visibleDays
+      .toReversed()
       .map((dayISO) => {
         let entries = store.entriesForDay(dayISO).filter((e) => e.end);
         if (filterProjectIds.size) {

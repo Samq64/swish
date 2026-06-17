@@ -168,7 +168,7 @@ export class AppStore {
   });
 
   static #sortByName(arr) {
-    return [...arr].sort((a, b) => a.name.localeCompare(b.name));
+    return arr.toSorted((a, b) => a.name.localeCompare(b.name));
   }
 
   // --- auth & bootstrap ------------------------------------------------------

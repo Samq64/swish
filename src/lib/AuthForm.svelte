@@ -51,8 +51,7 @@
 <style>
   .auth-wrap {
     /* dvh tracks the visible viewport so the mobile URL bar doesn't add
-       scrollable dead space below the card; vh is the fallback. */
-    min-height: 100vh;
+       scrollable dead space below the card. */
     min-height: 100dvh;
     display: flex;
     align-items: center;

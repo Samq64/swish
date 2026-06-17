@@ -148,7 +148,7 @@ export function packLanes(blocks) {
   const overlaps = (a, b) => a.startMin < b.endMin && b.startMin < a.endMin;
 
   // Cluster by time overlap (must walk in time order to find contiguous runs).
-  const byTime = [...blocks].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const byTime = blocks.toSorted((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
 
   let cluster = [];
   let clusterEnd = -Infinity;
@@ -156,7 +156,7 @@ export function packLanes(blocks) {
   const flush = () => {
     if (cluster.length === 0) return;
     // Within the cluster, place blocks in a STABLE order so columns are kept.
-    const ordered = [...cluster].sort((a, b) => (a.order ?? a.startMin) - (b.order ?? b.startMin));
+    const ordered = cluster.toSorted((a, b) => (a.order ?? a.startMin) - (b.order ?? b.startMin));
     /** @type {Array<Array<typeof ordered[number]>>} lanes[i] = blocks placed in column i */
     const lanes = [];
     for (const b of ordered) {
