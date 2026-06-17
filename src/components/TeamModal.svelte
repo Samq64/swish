@@ -308,26 +308,9 @@
     border-color: transparent;
     color: var(--muted);
   }
+  /* Compact variant of the shared .icon-btn (see app.css). */
   .icon-btn {
-    flex: none;
-    width: 30px;
-    height: 30px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    border-radius: var(--radius);
-    padding: 0;
-  }
-  .icon-btn:hover {
-    background: var(--bg);
-    color: var(--text);
-  }
-  .icon-btn.danger:hover {
-    color: #d63031;
-    border-color: #d63031;
+    --icon-btn-size: 30px;
   }
   .new-team {
     flex: 1;

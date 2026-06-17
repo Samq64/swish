@@ -1,6 +1,6 @@
 <script>
   import { store } from '../data/store.js';
-  import { startOfDay, addDays, formatDuration } from '../lib/time.js';
+  import { startOfDay, addDays, formatDuration, DAY_MS } from '../lib/time.js';
   import { entryDurationMin } from '../lib/entries.js';
 
   /**
@@ -16,7 +16,6 @@
    */
 
   const NO_PROJECT = '__none__';
-  const DAY_MS = 24 * 60 * 60 * 1000;
 
   /** @type {import('../data/repository.js').TimeEntry[]} */
   let entries = $state([]);

@@ -8,11 +8,9 @@
 
 import { json, error, readJson, sameOrigin } from '$lib/server/http.js';
 import { isIso, isStr, isStrArray, isHexColor } from '$lib/server/validate.js';
-import { hashPassword, verifyPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
+import { hashPassword, verifyUserPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
 import { clearSessionCookie } from '$lib/server/session.js';
 import { listWorkspaces, listProjects, listTags, listSharedWorkspaces } from '$lib/server/data.js';
-
-const LIST_SCOPED = { projects: listProjects, tags: listTags };
 
 const DEFAULT_COLOR = '#6c5ce7';
 const NAME_MAX = 200;
@@ -151,6 +149,54 @@ async function tagsInWorkspace(env, workspaceId, tagIds) {
   return results.length === unique.length;
 }
 
+// --- shared mutation helpers -------------------------------------------------
+
+/**
+ * Build the SET clause and bound values for a PATCH from the fields present in
+ * `body`. Each spec is `{ key, col?, present?, transform? }`:
+ *   - `key`       property to read from the body
+ *   - `col`       DB column to assign (defaults to `key`)
+ *   - `present`   `(body) => boolean` — when to include the field (default: `key in body`)
+ *   - `transform` `(value) => bound` — maps `body[key]` to the bound value (default: identity)
+ * Returns `{ sets, vals }` (a ready `a = ?, b = ?` string + values) or null when
+ * nothing is present. Column names come only from these literal specs, never
+ * from request data.
+ */
+function buildUpdate(specs, body) {
+  const sets = [];
+  const vals = [];
+  for (const s of specs) {
+    if (s.present ? !s.present(body) : !(s.key in body)) continue;
+    sets.push(`${s.col ?? s.key} = ?`);
+    vals.push(s.transform ? s.transform(body[s.key]) : body[s.key]);
+  }
+  return sets.length ? { sets: sets.join(', '), vals } : null;
+}
+
+/** Run an UPDATE produced by {@link buildUpdate} (no-op when `upd` is null).
+ *  `table` must be a literal/allowlisted value — never request data. */
+async function runUpdate(env, table, id, upd) {
+  if (upd) {
+    await env.DB.prepare(`UPDATE ${table} SET ${upd.sets} WHERE id = ?`).bind(...upd.vals, id).run();
+  }
+}
+
+/**
+ * Authorize-and-delete a workspace-scoped row in one statement: the WHERE only
+ * matches a row whose workspace the user owns, so `meta.changes` distinguishes
+ * success from forbidden/missing. `table` must be a literal/allowlisted value.
+ * Returns true when a row was deleted.
+ */
+async function deleteOwnedRow(env, table, id, userId) {
+  const res = await env.DB.prepare(
+    `DELETE FROM ${table} WHERE id = ?
+       AND workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)`,
+  )
+    .bind(id, userId)
+    .run();
+  return res.meta.changes > 0;
+}
+
 // --- entries -----------------------------------------------------------------
 
 const ENTRY_SELECT = `
@@ -235,15 +281,7 @@ async function handleEntries(ctx, rest, method, user) {
   const id = rest[0];
 
   if (method === 'DELETE') {
-    // Authorize and delete in one statement: the WHERE only matches a row the
-    // user owns, so meta.changes distinguishes success from forbidden/missing.
-    const res = await env.DB.prepare(
-      `DELETE FROM entries WHERE id = ?
-         AND workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)`,
-    )
-      .bind(id, user.id)
-      .run();
-    if (!res.meta.changes) return error(404, 'Not found');
+    if (!(await deleteOwnedRow(env, 'entries', id, user.id))) return error(404, 'Not found');
     return new Response(null, { status: 204 });
   }
 
@@ -261,18 +299,19 @@ async function handleEntries(ctx, rest, method, user) {
     if ('tagIds' in body && !(await tagsInWorkspace(env, workspaceId, body.tagIds)))
       return error(400, 'One or more tags do not belong to this workspace');
 
-    const sets = [];
-    const vals = [];
-    if ('description' in body) (sets.push('description = ?'), vals.push(body.description));
-    if ('projectId' in body) (sets.push('project_id = ?'), vals.push(body.projectId ?? null));
-    if ('start' in body) (sets.push('start = ?'), vals.push(body.start));
-    if ('end' in body) (sets.push('ended_at = ?'), vals.push(body.end ?? null));
+    const upd = buildUpdate(
+      [
+        { key: 'description' },
+        { key: 'projectId', col: 'project_id', transform: (v) => v ?? null },
+        { key: 'start' },
+        { key: 'end', col: 'ended_at', transform: (v) => v ?? null },
+      ],
+      body,
+    );
 
     const stmts = [];
-    if (sets.length) {
-      stmts.push(
-        env.DB.prepare(`UPDATE entries SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id),
-      );
+    if (upd) {
+      stmts.push(env.DB.prepare(`UPDATE entries SET ${upd.sets} WHERE id = ?`).bind(...upd.vals, id));
     }
     if ('tagIds' in body) {
       stmts.push(env.DB.prepare('DELETE FROM entry_tags WHERE entry_id = ?').bind(id));
@@ -311,10 +350,12 @@ function tagInserts(env, entryId, tagIds) {
 const SCOPED = {
   projects: {
     fields: ['name', 'color'],
+    list: listProjects,
     map: (r) => ({ id: r.id, workspaceId: r.workspace_id, name: r.name, color: r.color }),
   },
   tags: {
     fields: ['name'],
+    list: listTags,
     map: (r) => ({ id: r.id, workspaceId: r.workspace_id, name: r.name }),
   },
 };
@@ -327,7 +368,7 @@ async function handleScoped(ctx, table, rest, method, user) {
     if (method === 'GET') {
       const workspaceId = new URL(request.url).searchParams.get('workspaceId');
       if (!(await canReadWorkspace(env, user.id, workspaceId))) return error(403, 'Forbidden');
-      return json(await LIST_SCOPED[table](env, workspaceId));
+      return json(await cfg.list(env, workspaceId));
     }
     if (method === 'POST') {
       const body = (await readJson(request)) || {};
@@ -354,31 +395,15 @@ async function handleScoped(ctx, table, rest, method, user) {
     const invalid = validateScopedBody(table, body);
     if (invalid) return error(400, invalid);
     if (!(await ownsScopedRow(env, table, id, user.id))) return error(404, 'Not found');
-    const sets = [];
-    const vals = [];
-    for (const f of cfg.fields) {
-      if (f in body) (sets.push(`${f} = ?`), vals.push(body[f]));
-    }
-    if (sets.length) {
-      await env.DB.prepare(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`)
-        .bind(...vals, id)
-        .run();
-    }
+    await runUpdate(env, table, id, buildUpdate(cfg.fields.map((key) => ({ key })), body));
     const row = await env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(id).first();
     return json(cfg.map(row));
   }
 
   if (method === 'DELETE') {
-    // Authorize-and-delete in one statement (see entries DELETE). Deleting a
-    // project SET NULLs entries.project_id; deleting a tag cascades through
-    // entry_tags — both via FK rules in the schema.
-    const res = await env.DB.prepare(
-      `DELETE FROM ${table} WHERE id = ?
-         AND workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)`,
-    )
-      .bind(id, user.id)
-      .run();
-    if (!res.meta.changes) return error(404, 'Not found');
+    // Deleting a project SET NULLs entries.project_id; deleting a tag cascades
+    // through entry_tags — both via FK rules in the schema.
+    if (!(await deleteOwnedRow(env, table, id, user.id))) return error(404, 'Not found');
     return new Response(null, { status: 204 });
   }
   return error(405, 'Method not allowed');
@@ -437,15 +462,18 @@ async function handleWorkspaces(ctx, rest, method, user) {
       return error(400, 'name must be a string');
     if ('shared' in body && typeof body.shared !== 'boolean')
       return error(400, 'shared must be a boolean');
-    const sets = [];
-    const vals = [];
-    if (body.name != null) (sets.push('name = ?'), vals.push(body.name.toString()));
-    if ('shared' in body) (sets.push('shared = ?'), vals.push(body.shared ? 1 : 0));
-    if (sets.length) {
-      await env.DB.prepare(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = ?`)
-        .bind(...vals, id)
-        .run();
-    }
+    await runUpdate(
+      env,
+      'workspaces',
+      id,
+      buildUpdate(
+        [
+          { key: 'name', present: (b) => b.name != null, transform: (v) => v.toString() },
+          { key: 'shared', transform: (v) => (v ? 1 : 0) },
+        ],
+        body,
+      ),
+    );
     const row = await env.DB.prepare('SELECT id, name, shared FROM workspaces WHERE id = ?')
       .bind(id)
       .first();
@@ -592,6 +620,19 @@ async function listTeamsForUser(env, userId) {
   return { teams, invites };
 }
 
+/** Delete a membership (the manager's own can never be removed this way).
+ *  Returns true when a row was deleted. */
+async function removeTeamMembership(env, teamId, userId) {
+  const res = await env.DB.prepare(
+    `DELETE FROM team_members
+      WHERE team_id = ? AND user_id = ?
+        AND user_id != (SELECT manager_id FROM teams WHERE id = ?)`,
+  )
+    .bind(teamId, userId, teamId)
+    .run();
+  return res.meta.changes > 0;
+}
+
 /** Whether `userId` is already an active member of some team. */
 async function hasActiveTeam(env, userId) {
   const row = await env.DB.prepare(
@@ -669,28 +710,14 @@ async function handleTeams(ctx, rest, method, user) {
   // Leave a team or decline an invitation (acts on the caller's own membership).
   // The manager can't leave — deleting the team is the path for that.
   if (rest[1] === 'leave' && method === 'POST') {
-    const res = await env.DB.prepare(
-      `DELETE FROM team_members
-        WHERE team_id = ? AND user_id = ?
-          AND user_id != (SELECT manager_id FROM teams WHERE id = ?)`,
-    )
-      .bind(teamId, user.id, teamId)
-      .run();
-    if (!res.meta.changes) return error(404, 'Not found');
+    if (!(await removeTeamMembership(env, teamId, user.id))) return error(404, 'Not found');
     return new Response(null, { status: 204 });
   }
 
   // Manager removes a member (the manager can't be removed this way).
   if (rest[1] === 'members' && rest[2] && method === 'DELETE') {
     if (!(await isTeamManager(env, user.id, teamId))) return error(403, 'Forbidden');
-    const res = await env.DB.prepare(
-      `DELETE FROM team_members
-        WHERE team_id = ? AND user_id = ?
-          AND user_id != (SELECT manager_id FROM teams WHERE id = ?)`,
-    )
-      .bind(teamId, rest[2], teamId)
-      .run();
-    if (!res.meta.changes) return error(404, 'Not found');
+    if (!(await removeTeamMembership(env, teamId, rest[2]))) return error(404, 'Not found');
     return new Response(null, { status: 204 });
   }
 
@@ -735,25 +762,24 @@ async function handleSettings(ctx, rest, method, user) {
 
   if (rest[0] === 'preferences') {
     const body = (await readJson(request)) || {};
-    const sets = [];
-    const vals = [];
-    if ('theme' in body) {
-      if (!['auto', 'light', 'dark'].includes(body.theme)) return error(400, 'Invalid theme');
-      sets.push('theme = ?'), vals.push(body.theme);
-    }
-    if ('weekStart' in body) {
-      if (body.weekStart !== 0 && body.weekStart !== 1) return error(400, 'Invalid weekStart');
-      sets.push('week_start = ?'), vals.push(body.weekStart);
-    }
-    if ('hour12' in body) {
-      if (typeof body.hour12 !== 'boolean') return error(400, 'Invalid hour12');
-      sets.push('hour12 = ?'), vals.push(body.hour12 ? 1 : 0);
-    }
-    if (sets.length) {
-      await env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`)
-        .bind(...vals, user.id)
-        .run();
-    }
+    if ('theme' in body && !['auto', 'light', 'dark'].includes(body.theme))
+      return error(400, 'Invalid theme');
+    if ('weekStart' in body && body.weekStart !== 0 && body.weekStart !== 1)
+      return error(400, 'Invalid weekStart');
+    if ('hour12' in body && typeof body.hour12 !== 'boolean') return error(400, 'Invalid hour12');
+    await runUpdate(
+      env,
+      'users',
+      user.id,
+      buildUpdate(
+        [
+          { key: 'theme' },
+          { key: 'weekStart', col: 'week_start' },
+          { key: 'hour12', transform: (v) => (v ? 1 : 0) },
+        ],
+        body,
+      ),
+    );
     return json({ ok: true });
   }
   return error(404, 'Not found');
@@ -797,17 +823,8 @@ async function handleAuth(ctx, rest, method, user) {
     const body = (await readJson(request)) || {};
     const newPassword = body.newPassword ?? '';
     if (newPassword.length < 8) return error(400, 'New password must be at least 8 characters');
-    const cur = await env.DB.prepare(
-      'SELECT pw_hash, pw_salt, pw_iterations FROM users WHERE id = ?',
-    )
-      .bind(user.id)
-      .first();
-    const ok = await verifyPassword(
-      body.currentPassword ?? '',
-      { hash: cur.pw_hash, salt: cur.pw_salt, iterations: cur.pw_iterations },
-      env.PEPPER,
-    );
-    if (!ok) return error(403, 'Current password is incorrect');
+    if (!(await verifyUserPassword(env, 'id', user.id, body.currentPassword ?? '')))
+      return error(403, 'Current password is incorrect');
     const pw = await hashPassword(newPassword, env.PEPPER);
     // Keep this session; revoke every other one as a precaution.
     await env.DB.batch([
@@ -821,17 +838,8 @@ async function handleAuth(ctx, rest, method, user) {
 
   if (action === 'account' && method === 'DELETE') {
     const body = (await readJson(request)) || {};
-    const cur = await env.DB.prepare(
-      'SELECT pw_hash, pw_salt, pw_iterations FROM users WHERE id = ?',
-    )
-      .bind(user.id)
-      .first();
-    const ok = await verifyPassword(
-      body.password ?? '',
-      { hash: cur.pw_hash, salt: cur.pw_salt, iterations: cur.pw_iterations },
-      env.PEPPER,
-    );
-    if (!ok) return error(403, 'Password is incorrect');
+    if (!(await verifyUserPassword(env, 'id', user.id, body.password ?? '')))
+      return error(403, 'Password is incorrect');
     // FK cascade drops the user's sessions, workspaces, projects, tags, entries.
     await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id).run();
     clearSessionCookie(cookies);

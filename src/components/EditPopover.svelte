@@ -246,7 +246,7 @@
     {#if readOnly}
       {#if assignedTags.length}
         <span class="ro-chips">
-          {#each assignedTags as t (t.id)}<span class="chip">{t.name}</span>{/each}
+          {#each assignedTags as t (t.id)}<span class="tag-chip">{t.name}</span>{/each}
         </span>
       {:else}
         <span class="ro-none">No tags</span>
@@ -435,14 +435,6 @@
     flex-wrap: wrap;
     gap: var(--space-1);
   }
-  .ro-chips .chip {
-    background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-    color: color-mix(in srgb, var(--accent) 75%, var(--text));
-    border-radius: 999px;
-    padding: 1px var(--space-2);
-    font-size: 12px;
-    font-weight: 600;
-  }
   .ro-none {
     font-size: 13px;
     color: var(--muted);
@@ -487,7 +479,7 @@
   .delete {
     background: none;
     border: none;
-    color: #d63031;
+    color: var(--danger);
     font-size: 13px;
     padding: var(--space-1);
   }

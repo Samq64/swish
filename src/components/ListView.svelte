@@ -2,7 +2,7 @@
   import { store } from '../data/store.js';
   import { formatClock, formatDuration, dateToMinutes } from '../lib/time.js';
   import { entryProject, entryTagNames, entryDurationMin } from '../lib/entries.js';
-  import EditPopover from './EditPopover.svelte';
+  import EntryEditorHost from './EntryEditorHost.svelte';
 
   /**
    * A flat list of entries in the visible range, grouped by day (most recent
@@ -20,10 +20,6 @@
   let filterTagIds = $state(new Set());
   /** @type {Set<string>} project ids; NO_PROJECT matches entries with none. */
   let filterProjectIds = $state(new Set());
-
-  let selectedEntry = $derived(
-    selectedId ? (store.entries.find((e) => e.id === selectedId) ?? null) : null,
-  );
 
   let anyFilter = $derived(filterTagIds.size > 0 || filterProjectIds.size > 0);
 
@@ -201,28 +197,7 @@
   </div>
 </div>
 
-{#if selectedEntry}
-  {@const sid = selectedEntry.id}
-  <!-- Keyed by entry id (see TimelineView): keeps the callbacks bound to `sid`
-       so a flushed description edit targets the entry the editor was editing. -->
-  {#key sid}
-    <EditPopover
-      entry={selectedEntry}
-      projects={store.projects}
-      tags={store.tags}
-      {anchor}
-      {bounds}
-      readOnly={store.readOnly}
-      onCreateTag={(name) => store.addTag({ name })}
-      onChange={(patch) => store.update(sid, patch)}
-      onDelete={() => {
-        store.remove(sid);
-        selectedId = null;
-      }}
-      onClose={() => (selectedId = null)}
-    />
-  {/key}
-{/if}
+<EntryEditorHost {selectedId} {anchor} {bounds} onClose={() => (selectedId = null)} />
 
 <style>
   .list-view {

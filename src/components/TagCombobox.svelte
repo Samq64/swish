@@ -40,7 +40,7 @@
     {#if selectedTags.length}
       <span class="chips">
         {#each selectedTags as t (t.id)}
-          <span class="chip">{t.name}</span>
+          <span class="tag-chip">{t.name}</span>
         {/each}
       </span>
     {:else}
@@ -117,17 +117,6 @@
     flex-wrap: wrap;
     gap: var(--space-1);
     flex: 1;
-  }
-  /* Chips echo the entry's accent (the popover overrides --accent with the
-     project colour) using the same mix as the timeline block's tags, so the
-     editor reads as belonging to that task. */
-  .chip {
-    background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-    color: color-mix(in srgb, var(--accent) 75%, var(--text));
-    border-radius: 999px;
-    padding: 1px var(--space-2);
-    font-size: 12px;
-    font-weight: 600;
   }
   .placeholder {
     flex: 1;

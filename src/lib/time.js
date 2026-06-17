@@ -8,6 +8,12 @@
 
 export const MINUTES_PER_DAY = 24 * 60;
 
+/** Milliseconds in one day. */
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** [0, 1, … 23] — the hours of a day, for laying out the timeline grid. */
+export const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
 /** Vertical scale of the timeline. One hour == this many pixels. */
 export const PX_PER_HOUR = 60;
 
@@ -96,6 +102,11 @@ export function isSameDay(a, b) {
     da.getMonth() === db.getMonth() &&
     da.getDate() === db.getDate()
   );
+}
+
+/** Whether an ISO/Date value falls on the current local day. */
+export function isToday(value) {
+  return isSameDay(value, new Date());
 }
 
 /** Human label for a duration in minutes, e.g. "1:30:00". */

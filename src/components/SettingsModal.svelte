@@ -251,23 +251,23 @@
     padding-top: var(--space-4);
   }
   .danger h3 {
-    color: #d63031;
+    color: var(--danger);
   }
   .btn.delete {
-    border-color: #d63031;
-    color: #d63031;
+    border-color: var(--danger);
+    color: var(--danger);
   }
   /* Theme-adaptive tint so the hover reads correctly in light and dark
      (the old hard-coded light pink looked wrong on the dark surface). */
   .btn.delete:hover:not(:disabled) {
-    background: color-mix(in srgb, #d63031 14%, var(--surface));
+    background: color-mix(in srgb, var(--danger) 14%, var(--surface));
   }
   .msg {
     margin: 0;
     font-size: 13px;
   }
   .msg.error {
-    color: #d63031;
+    color: var(--danger);
   }
   .msg.ok {
     color: #00a36c;

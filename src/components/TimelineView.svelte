@@ -1,8 +1,8 @@
 <script>
   import { store } from '../data/store.js';
-  import { minutesToPx, MINUTES_PER_DAY, startOfDay, clamp } from '../lib/time.js';
+  import { minutesToPx, MINUTES_PER_DAY, HOURS, clamp, isToday } from '../lib/time.js';
   import DayColumn from './DayColumn.svelte';
-  import EditPopover from './EditPopover.svelte';
+  import EntryEditorHost from './EntryEditorHost.svelte';
 
   let scrollEl = $state(null);
 
@@ -18,14 +18,6 @@
   let anchor = $state(null);
   let bounds = $state(null);
 
-  let selectedEntry = $derived(
-    selectedId
-      ? (store.entries.find((e) => e.id === selectedId) ?? null)
-      : null,
-  );
-
-  const hours = Array.from({ length: 24 }, (_, h) => h);
-
   function hourLabel(h) {
     if (!store.hour12) return String(h).padStart(2, '0');
     if (h === 0) return '12 AM';
@@ -38,9 +30,6 @@
   }
   function dayNum(iso) {
     return new Date(iso).getDate();
-  }
-  function isToday(iso) {
-    return startOfDay(iso).getTime() === startOfDay(new Date()).getTime();
   }
 
   // On first mount, scroll vertically to "now" and — when the week overflows
@@ -165,7 +154,7 @@
 
     <div class="body" style:height="{minutesToPx(MINUTES_PER_DAY)}px">
       <div class="gutter">
-        {#each hours as h (h)}
+        {#each HOURS as h (h)}
           <div
             class="hour-label"
             class:first={h === 0}
@@ -189,31 +178,7 @@
   </div>
 </div>
 
-{#if selectedEntry}
-  {@const sid = selectedEntry.id}
-  <!-- Keyed by entry id so each selection gets a fresh editor instance: its
-       callbacks stay bound to `sid`, so a pending description edit flushed as the
-       editor tears down still targets the entry it was editing, not the new one. -->
-  {#key sid}
-    <EditPopover
-      entry={selectedEntry}
-      projects={store.projects}
-      tags={store.tags}
-      {anchor}
-      {bounds}
-      running={selectedEntry.end === null}
-      readOnly={store.readOnly}
-      onCreateTag={(name) => store.addTag({ name })}
-      onChange={(patch) => store.update(sid, patch)}
-      onStop={() => store.stop(sid)}
-      onDelete={() => {
-        store.remove(sid);
-        selectedId = null;
-      }}
-      onClose={() => (selectedId = null)}
-    />
-  {/key}
-{/if}
+<EntryEditorHost {selectedId} {anchor} {bounds} onClose={() => (selectedId = null)} />
 
 <style>
   .view {

@@ -1,6 +1,5 @@
-import { startOfDay, startOfWeek, addDays, fromDateInput, toDateInput } from '../lib/time.js';
+import { startOfDay, startOfWeek, addDays, fromDateInput, toDateInput, DAY_MS } from '../lib/time.js';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 // Past this many days a day-bucketed report chart has too many bars to read, so
 // it switches to monthly buckets (matches the Year preset's granularity).
 const REPORT_MONTH_BUCKET_THRESHOLD = 62;
@@ -435,7 +434,7 @@ export class AppStore {
   /** Entries belonging to a single day (start within that day). */
   entriesForDay(dayISO) {
     const from = startOfDay(dayISO).getTime();
-    const to = from + 24 * 60 * 60 * 1000;
+    const to = from + DAY_MS;
     return this.entries.filter((e) => {
       const t = new Date(e.start).getTime();
       return t >= from && t < to;

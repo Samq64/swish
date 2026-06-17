@@ -79,6 +79,28 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
+/**
+ * Look up a user by `column` (callers pass a literal — `'id'` or `'username'`)
+ * and verify `password` against their stored credentials. Returns the row
+ * (including `id`) on success, or null when the user is missing or the password
+ * is wrong. Centralizes the SELECT + { hash, salt, iterations } reshaping used
+ * by sign-in, change-password and delete-account.
+ */
+export async function verifyUserPassword(env, column, value, password) {
+  const row = await env.DB.prepare(
+    `SELECT id, pw_hash, pw_salt, pw_iterations FROM users WHERE ${column} = ?`,
+  )
+    .bind(value)
+    .first();
+  if (!row) return null;
+  const ok = await verifyPassword(
+    password,
+    { hash: row.pw_hash, salt: row.pw_salt, iterations: row.pw_iterations },
+    env.PEPPER,
+  );
+  return ok ? row : null;
+}
+
 // --- sessions ----------------------------------------------------------------
 
 /** A fresh high-entropy session token (the raw value goes in the cookie). */

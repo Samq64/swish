@@ -86,7 +86,7 @@
   }
   .error {
     margin: 0;
-    color: #d63031;
+    color: var(--danger);
     font-size: 13px;
   }
   button {

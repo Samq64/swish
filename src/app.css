@@ -15,6 +15,8 @@
      the saturated project/brand accents; the no-project gray below flips it. */
   --on-accent: #ffffff;
   --no-project: light-dark(#9ca3af, #6b7280);
+  /* Destructive actions: delete buttons/icons, danger headings, error text. */
+  --danger: #d63031;
   /* The editor's accent when an entry has no project: a gray that contrasts
      with the surface in each theme (dark on light, light on dark), unlike the
      mid --no-project dot. Pair with --on-accent light-dark(#fff, #16161c). */
@@ -205,10 +207,49 @@ textarea:focus {
   align-items: center;
   border: none;
   background: none;
-  color: #d63031;
+  color: var(--danger);
   flex: none;
   padding: var(--space-1);
   cursor: pointer;
+}
+
+/* Square bordered icon button (row-level export/delete). Size via
+   --icon-btn-size; add `.danger` for a destructive hover. */
+.icon-btn {
+  flex: none;
+  width: var(--icon-btn-size, 36px);
+  height: var(--icon-btn-size, 36px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: var(--radius);
+  padding: 0;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--text);
+}
+.icon-btn.danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Tag pill tinted to the surrounding --accent (the entry editor overrides
+   --accent with the entry's project colour, so chips read as part of it). */
+.tag-chip {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 75%, var(--text));
+  border-radius: 999px;
+  padding: 1px var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* Empty-state placeholder text. */

@@ -3,12 +3,15 @@
   import {
     MINUTES_PER_DAY,
     MIN_DURATION,
+    DAY_MS,
+    HOURS,
     minutesToPx,
     pxToMinutes,
     snap,
     clamp,
     startOfDay,
     minutesToISO,
+    isToday,
     packLanes,
   } from '../lib/time.js';
   import { entryColor, entryTagNames } from '../lib/entries.js';
@@ -60,8 +63,6 @@
    * @type {null | Map<string, {lane: number, lanes: number}>}
    */
   let frozenLanes = $state(null);
-
-  const hours = Array.from({ length: 24 }, (_, h) => h);
 
   let dayEntries = $derived(store.entriesForDay(dayISO));
 
@@ -363,9 +364,6 @@
   $effect(() => clock.subscribe());
   // Drop any pending long-press if this column unmounts mid-hold.
   $effect(() => cancelLongPress);
-  let isToday = $derived(
-    startOfDay(dayISO).getTime() === startOfDay(new Date()).getTime(),
-  );
 
   /**
    * The running entry as a live block growing to "now". It is kept out of
@@ -377,7 +375,7 @@
     if (!r) return null;
     const dayStart = startOfDay(dayISO).getTime();
     const startTs = new Date(r.start).getTime();
-    if (startTs < dayStart || startTs >= dayStart + 86_400_000) return null;
+    if (startTs < dayStart || startTs >= dayStart + DAY_MS) return null;
     const startMin = clamp((startTs - dayStart) / 60000, 0, MINUTES_PER_DAY);
     const endMin = clamp(clock.minute, startMin, MINUTES_PER_DAY);
     return { id: r.id, startMin, endMin, lane: 0, lanes: 1 };
@@ -396,7 +394,7 @@
   onpointercancel={onPointerCancel}
   ontouchmove={onTouchMove}
 >
-  {#each hours as h (h)}
+  {#each HOURS as h (h)}
     <div class="hour-line" style:top="{minutesToPx(h * 60)}px"></div>
   {/each}
 
@@ -455,7 +453,7 @@
     {/if}
   </div>
 
-  {#if isToday}
+  {#if isToday(dayISO)}
     <div class="now-line" style:top="{minutesToPx(clock.minute)}px">
       <span class="now-dot"></span>
     </div>

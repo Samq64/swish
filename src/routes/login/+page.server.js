@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { verifyPassword } from '$lib/server/auth.js';
+import { verifyUserPassword } from '$lib/server/auth.js';
 import { createSession, setSessionCookie } from '$lib/server/session.js';
 
 export function load({ locals }) {
@@ -15,19 +15,8 @@ export const actions = {
     const username = (form.get('username') ?? '').toString().trim();
     const password = (form.get('password') ?? '').toString();
 
-    const row = await env.DB.prepare(
-      'SELECT id, pw_hash, pw_salt, pw_iterations FROM users WHERE username = ?',
-    )
-      .bind(username)
-      .first();
-    const ok =
-      row &&
-      (await verifyPassword(
-        password,
-        { hash: row.pw_hash, salt: row.pw_salt, iterations: row.pw_iterations },
-        env.PEPPER,
-      ));
-    if (!ok) return fail(401, { error: 'Invalid username or password.', username });
+    const row = await verifyUserPassword(env, 'username', username, password);
+    if (!row) return fail(401, { error: 'Invalid username or password.', username });
 
     setSessionCookie(cookies, await createSession(env, row.id));
     throw redirect(303, '/');

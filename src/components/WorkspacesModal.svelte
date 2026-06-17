@@ -159,31 +159,6 @@
     color: var(--muted);
     white-space: nowrap;
   }
-  .icon-btn {
-    flex: none;
-    width: 36px;
-    height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    border-radius: var(--radius);
-    padding: 0;
-  }
-  .icon-btn:hover:not(:disabled) {
-    background: var(--bg);
-    color: var(--text);
-  }
-  .icon-btn.danger:hover:not(:disabled) {
-    color: #d63031;
-    border-color: #d63031;
-  }
-  .icon-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
-  }
   .add {
     display: inline-flex;
     align-items: center;
