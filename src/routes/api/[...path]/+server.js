@@ -69,9 +69,7 @@ async function route(event) {
 
 async function ownsWorkspace(env, userId, workspaceId) {
   if (!workspaceId) return false;
-  const row = await env.DB.prepare(
-    'SELECT 1 AS ok FROM workspaces WHERE id = ? AND user_id = ?',
-  )
+  const row = await env.DB.prepare('SELECT 1 AS ok FROM workspaces WHERE id = ? AND user_id = ?')
     .bind(workspaceId, userId)
     .first();
   return !!row;
@@ -128,9 +126,7 @@ async function ownedEntryWorkspace(env, userId, id) {
 /** True when projectId is null/absent or a project in `workspaceId`. */
 async function projectInWorkspace(env, workspaceId, projectId) {
   if (projectId == null) return true;
-  const row = await env.DB.prepare(
-    'SELECT 1 AS ok FROM projects WHERE id = ? AND workspace_id = ?',
-  )
+  const row = await env.DB.prepare('SELECT 1 AS ok FROM projects WHERE id = ? AND workspace_id = ?')
     .bind(projectId, workspaceId)
     .first();
   return !!row;
@@ -177,7 +173,9 @@ function buildUpdate(specs, body) {
  *  `table` must be a literal/allowlisted value — never request data. */
 async function runUpdate(env, table, id, upd) {
   if (upd) {
-    await env.DB.prepare(`UPDATE ${table} SET ${upd.sets} WHERE id = ?`).bind(...upd.vals, id).run();
+    await env.DB.prepare(`UPDATE ${table} SET ${upd.sets} WHERE id = ?`)
+      .bind(...upd.vals, id)
+      .run();
   }
 }
 
@@ -294,7 +292,10 @@ async function handleEntries(ctx, rest, method, user) {
     const body = (await readJson(request)) || {};
     const invalid = validateEntryBody(body, { requireStart: false });
     if (invalid) return error(400, invalid);
-    if ('projectId' in body && !(await projectInWorkspace(env, workspaceId, body.projectId ?? null)))
+    if (
+      'projectId' in body &&
+      !(await projectInWorkspace(env, workspaceId, body.projectId ?? null))
+    )
       return error(400, 'Project does not belong to this workspace');
     if ('tagIds' in body && !(await tagsInWorkspace(env, workspaceId, body.tagIds)))
       return error(400, 'One or more tags do not belong to this workspace');
@@ -311,7 +312,9 @@ async function handleEntries(ctx, rest, method, user) {
 
     const stmts = [];
     if (upd) {
-      stmts.push(env.DB.prepare(`UPDATE entries SET ${upd.sets} WHERE id = ?`).bind(...upd.vals, id));
+      stmts.push(
+        env.DB.prepare(`UPDATE entries SET ${upd.sets} WHERE id = ?`).bind(...upd.vals, id),
+      );
     }
     if ('tagIds' in body) {
       stmts.push(env.DB.prepare('DELETE FROM entry_tags WHERE entry_id = ?').bind(id));
@@ -375,7 +378,11 @@ async function handleScoped(ctx, table, rest, method, user) {
       if (!(await ownsWorkspace(env, user.id, body.workspaceId))) return error(403, 'Forbidden');
       const invalid = validateScopedBody(table, body);
       if (invalid) return error(400, invalid);
-      const row = { id: crypto.randomUUID(), workspace_id: body.workspaceId, name: body.name ?? '' };
+      const row = {
+        id: crypto.randomUUID(),
+        workspace_id: body.workspaceId,
+        name: body.name ?? '',
+      };
       if (table === 'projects') row.color = body.color ?? DEFAULT_COLOR;
       const cols = Object.keys(row);
       await env.DB.prepare(
@@ -395,7 +402,15 @@ async function handleScoped(ctx, table, rest, method, user) {
     const invalid = validateScopedBody(table, body);
     if (invalid) return error(400, invalid);
     if (!(await ownsScopedRow(env, table, id, user.id))) return error(404, 'Not found');
-    await runUpdate(env, table, id, buildUpdate(cfg.fields.map((key) => ({ key })), body));
+    await runUpdate(
+      env,
+      table,
+      id,
+      buildUpdate(
+        cfg.fields.map((key) => ({ key })),
+        body,
+      ),
+    );
     const row = await env.DB.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(id).first();
     return json(cfg.map(row));
   }
@@ -484,9 +499,9 @@ async function handleWorkspaces(ctx, rest, method, user) {
     // Cascade drops the workspace's projects, tags and entries.
     await env.DB.batch([
       env.DB.prepare('DELETE FROM workspaces WHERE id = ?').bind(id),
-      env.DB
-        .prepare('UPDATE users SET active_workspace_id = NULL WHERE id = ? AND active_workspace_id = ?')
-        .bind(user.id, id),
+      env.DB.prepare(
+        'UPDATE users SET active_workspace_id = NULL WHERE id = ? AND active_workspace_id = ?',
+      ).bind(user.id, id),
     ]);
     return new Response(null, { status: 204 });
   }
@@ -496,7 +511,9 @@ async function handleWorkspaces(ctx, rest, method, user) {
 async function exportWorkspace(env, id) {
   const ws = await env.DB.prepare('SELECT name FROM workspaces WHERE id = ?').bind(id).first();
   const projects = (
-    await env.DB.prepare('SELECT id, name, color FROM projects WHERE workspace_id = ?').bind(id).all()
+    await env.DB.prepare('SELECT id, name, color FROM projects WHERE workspace_id = ?')
+      .bind(id)
+      .all()
   ).results;
   const tags = (
     await env.DB.prepare('SELECT id, name FROM tags WHERE workspace_id = ?').bind(id).all()
@@ -518,7 +535,11 @@ async function importWorkspace(env, userId, payload) {
   const wsId = crypto.randomUUID();
   const name = (payload?.name || 'Imported workspace').toString();
   const stmts = [
-    env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(wsId, userId, name),
+    env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(
+      wsId,
+      userId,
+      name,
+    ),
   ];
 
   const projectIdMap = new Map();
@@ -540,13 +561,17 @@ async function importWorkspace(env, userId, payload) {
     const nt = crypto.randomUUID();
     tagIdMap.set(t.id, nt);
     stmts.push(
-      env.DB.prepare('INSERT INTO tags (id, workspace_id, name) VALUES (?,?,?)').bind(nt, wsId, t.name ?? 'tag'),
+      env.DB.prepare('INSERT INTO tags (id, workspace_id, name) VALUES (?,?,?)').bind(
+        nt,
+        wsId,
+        t.name ?? 'tag',
+      ),
     );
   }
 
   for (const e of payload?.entries ?? []) {
     const ne = crypto.randomUUID();
-    const projectId = e.projectId != null ? projectIdMap.get(e.projectId) ?? null : null;
+    const projectId = e.projectId != null ? (projectIdMap.get(e.projectId) ?? null) : null;
     stmts.push(
       env.DB.prepare(
         'INSERT INTO entries (id, workspace_id, description, project_id, start, ended_at) VALUES (?,?,?,?,?,?)',
@@ -554,7 +579,10 @@ async function importWorkspace(env, userId, payload) {
     );
     for (const tid of e.tagIds ?? []) {
       const nt = tagIdMap.get(tid);
-      if (nt) stmts.push(env.DB.prepare('INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)').bind(ne, nt));
+      if (nt)
+        stmts.push(
+          env.DB.prepare('INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)').bind(ne, nt),
+        );
     }
   }
 
@@ -659,12 +687,12 @@ async function handleTeams(ctx, rest, method, user) {
       const now = new Date().toISOString();
       // The creator is the manager and an active member.
       await env.DB.batch([
-        env.DB
-          .prepare('INSERT INTO teams (id, name, manager_id, created_at) VALUES (?,?,?,?)')
-          .bind(id, name, user.id, now),
-        env.DB
-          .prepare('INSERT INTO team_members (team_id, user_id, status, created_at) VALUES (?,?,?,?)')
-          .bind(id, user.id, 'active', now),
+        env.DB.prepare(
+          'INSERT INTO teams (id, name, manager_id, created_at) VALUES (?,?,?,?)',
+        ).bind(id, name, user.id, now),
+        env.DB.prepare(
+          'INSERT INTO team_members (team_id, user_id, status, created_at) VALUES (?,?,?,?)',
+        ).bind(id, user.id, 'active', now),
       ]);
       return json({ id, name });
     }
@@ -828,10 +856,13 @@ async function handleAuth(ctx, rest, method, user) {
     const pw = await hashPassword(newPassword, env.PEPPER);
     // Keep this session; revoke every other one as a precaution.
     await env.DB.batch([
-      env.DB
-        .prepare('UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iterations = ? WHERE id = ?')
-        .bind(pw.hash, pw.salt, pw.iterations, user.id),
-      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(user.id, await currentSid()),
+      env.DB.prepare(
+        'UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iterations = ? WHERE id = ?',
+      ).bind(pw.hash, pw.salt, pw.iterations, user.id),
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?').bind(
+        user.id,
+        await currentSid(),
+      ),
     ]);
     return json({ ok: true });
   }

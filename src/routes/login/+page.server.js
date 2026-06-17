@@ -10,7 +10,7 @@ export const actions = {
   // SvelteKit's CSRF protection rejects cross-origin form posts, so there's no
   // hand-rolled origin check here.
   default: async ({ request, cookies, platform }) => {
-    const env = platform.env;
+    const env = /** @type {App.Platform} */ (platform).env;
     const form = await request.formData();
     const username = (form.get('username') ?? '').toString().trim();
     const password = (form.get('password') ?? '').toString();

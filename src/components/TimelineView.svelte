@@ -4,6 +4,7 @@
   import DayColumn from './DayColumn.svelte';
   import EntryEditorHost from './EntryEditorHost.svelte';
 
+  /** @type {HTMLDivElement | null} */
   let scrollEl = $state(null);
 
   /**
@@ -15,7 +16,9 @@
   let selectedId = $state(null);
   // The selected entry's live on-screen rect (editor anchors to it) and the
   // safe region the editor may occupy (viewport minus the sticky header).
+  /** @type {{ left: number, right: number, top: number, bottom: number, width: number, height: number, contentRight: number } | null} */
   let anchor = $state(null);
+  /** @type {{ top: number, bottom: number } | null} */
   let bounds = $state(null);
 
   function hourLabel(h) {
@@ -92,10 +95,11 @@
       bounds = null;
       return;
     }
+    const sEl = scrollEl; // captured non-null for the rAF closure below
     let raf;
     const measureRange = document.createRange();
     const tick = () => {
-      const el = scrollEl.querySelector(`[data-entry-id="${id}"]`);
+      const el = sEl.querySelector(`[data-entry-id="${id}"]`);
       if (el) {
         const r = el.getBoundingClientRect();
         // Right edge of the actual text content (glyph-precise via a Range, so a
@@ -116,12 +120,20 @@
           anchor.height !== r.height ||
           anchor.contentRight !== contentRight
         ) {
-          anchor = { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, contentRight };
+          anchor = {
+            left: r.left,
+            top: r.top,
+            right: r.right,
+            bottom: r.bottom,
+            width: r.width,
+            height: r.height,
+            contentRight,
+          };
         }
       }
 
-      const sr = scrollEl.getBoundingClientRect();
-      const head = scrollEl.querySelector('.header-row');
+      const sr = sEl.getBoundingClientRect();
+      const head = sEl.querySelector('.header-row');
       const top = head ? head.getBoundingClientRect().bottom : sr.top;
       if (!bounds || bounds.top !== top || bounds.bottom !== sr.bottom) {
         bounds = { top, bottom: sr.bottom };
@@ -155,24 +167,14 @@
     <div class="body" style:height="{minutesToPx(MINUTES_PER_DAY)}px">
       <div class="gutter">
         {#each HOURS as h (h)}
-          <div
-            class="hour-label"
-            class:first={h === 0}
-            style:top="{minutesToPx(h * 60)}px"
-          >
+          <div class="hour-label" class:first={h === 0} style:top="{minutesToPx(h * 60)}px">
             {hourLabel(h)}
           </div>
         {/each}
       </div>
 
       {#each store.visibleDays as iso (iso)}
-        <DayColumn
-          dayISO={iso}
-          {selectedId}
-          onSelect={handleSelect}
-          {registerColumn}
-          {dayAtX}
-        />
+        <DayColumn dayISO={iso} {selectedId} onSelect={handleSelect} {registerColumn} {dayAtX} />
       {/each}
     </div>
   </div>

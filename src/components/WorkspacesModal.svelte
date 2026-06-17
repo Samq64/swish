@@ -43,8 +43,7 @@
 
   async function removeWorkspace(w) {
     if (store.workspaces.length <= 1) return;
-    if (!confirm(`Delete “${w.name}” and all its entries? This can't be undone.`))
-      return;
+    if (!confirm(`Delete “${w.name}” and all its entries? This can't be undone.`)) return;
     await store.deleteWorkspace(w.id);
   }
 

@@ -31,12 +31,7 @@
 </script>
 
 <div class="combo" use:clickOutside={() => (open = false)}>
-  <button
-    type="button"
-    class="trigger"
-    aria-expanded={open}
-    onclick={() => (open = !open)}
-  >
+  <button type="button" class="trigger" aria-expanded={open} onclick={() => (open = !open)}>
     {#if selectedTags.length}
       <span class="chips">
         {#each selectedTags as t (t.id)}
@@ -70,11 +65,7 @@
       <div class="options">
         {#each filtered as t (t.id)}
           <label class="option">
-            <input
-              type="checkbox"
-              checked={selected.has(t.id)}
-              onchange={() => onToggle?.(t.id)}
-            />
+            <input type="checkbox" checked={selected.has(t.id)} onchange={() => onToggle?.(t.id)} />
             <span class="box" aria-hidden="true"><Icon name="check" size={12} /></span>
             <span>{t.name}</span>
           </label>

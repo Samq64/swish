@@ -50,7 +50,9 @@
 
   // Calendar days the range covers, so "avg / day" reflects the whole window
   // (including days with nothing tracked), not just active days.
-  let dayCount = $derived(Math.max(1, Math.round((range.to - range.from) / DAY_MS)));
+  let dayCount = $derived(
+    Math.max(1, Math.round((range.to.getTime() - range.from.getTime()) / DAY_MS)),
+  );
 
   /** Time per project, largest first, with display name + colour resolved. */
   let byProject = $derived.by(() => {
@@ -107,7 +109,7 @@
       const idx =
         unit === 'month'
           ? (t.getFullYear() - from.getFullYear()) * 12 + (t.getMonth() - from.getMonth())
-          : Math.floor((startOfDay(t) - startOfDay(from)) / DAY_MS);
+          : Math.floor((startOfDay(t).getTime() - startOfDay(from).getTime()) / DAY_MS);
       if (idx >= 0 && idx < list.length) list[idx].min += entryDurationMin(e);
     }
     return list;
@@ -127,8 +129,7 @@
   let axis = $derived.by(() => {
     if (maxBucket <= 0) return { max: 60, ticks: [0, 60] }; // empty-ish range
     const target = maxBucket / 4; // aim for ~4 intervals
-    const step =
-      AXIS_STEPS.find((s) => s >= target) ?? Math.ceil(target / 1440) * 1440;
+    const step = AXIS_STEPS.find((s) => s >= target) ?? Math.ceil(target / 1440) * 1440;
     const max = Math.ceil(maxBucket / step) * step;
     const ticks = [];
     for (let v = 0; v <= max + 0.5; v += step) ticks.push(v);
@@ -170,7 +171,6 @@
           });
     return `${when} · ${formatDuration(bucket.min)}`;
   }
-
 </script>
 
 <div class="reports fill-col">

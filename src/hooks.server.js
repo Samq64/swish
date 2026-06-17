@@ -10,7 +10,8 @@ import { resolveUser } from '$lib/server/session.js';
 const PUBLIC = new Set(['/login', '/register', '/logout']);
 
 export async function handle({ event, resolve }) {
-  event.locals.user = await resolveUser(event.platform.env, event.cookies.get(COOKIE_NAME));
+  const { env } = /** @type {App.Platform} */ (event.platform);
+  event.locals.user = await resolveUser(env, event.cookies.get(COOKIE_NAME));
 
   const { pathname } = event.url;
   if (!pathname.startsWith('/api') && !PUBLIC.has(pathname) && !event.locals.user) {

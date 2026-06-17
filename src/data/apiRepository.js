@@ -60,8 +60,7 @@ export function createApiRepository() {
     deleteAccount: (password) => request('DELETE', '/auth/account', { password }),
 
     // --- entries ---
-    listEntries: ({ from, to, workspaceId }) =>
-      get(`/entries${qs({ workspaceId, from, to })}`),
+    listEntries: ({ from, to, workspaceId }) => get(`/entries${qs({ workspaceId, from, to })}`),
     createEntry: (data) => post('/entries', data),
     updateEntry: (id, patchData) => patch(`/entries/${id}`, patchData),
     deleteEntry: (id) => del(`/entries/${id}`),

@@ -17,7 +17,12 @@ export async function listProjects(env, workspaceId) {
   )
     .bind(workspaceId)
     .all();
-  return results.map((r) => ({ id: r.id, workspaceId: r.workspace_id, name: r.name, color: r.color }));
+  return results.map((r) => ({
+    id: r.id,
+    workspaceId: r.workspace_id,
+    name: r.name,
+    color: r.color,
+  }));
 }
 
 export async function listTags(env, workspaceId) {

@@ -28,7 +28,9 @@
   const MARGIN = 8; // keep this far from every viewport edge
   const GAP = 8; // offset from the anchored entry block
 
+  /** @type {HTMLDivElement | null} */
   let el = $state(null);
+  /** @type {{ x: number, y: number } | null} */
   let coords = $state(null);
 
   // Every edit is buffered in `draft` and persisted as ONE update only when the
@@ -118,9 +120,7 @@
   // theme-aware gray and flip --on-accent (the glyph colour on accent fills) so
   // a check / button label stays readable on a light-gray accent in dark mode.
   let accent = $derived(selectedProject?.color ?? 'var(--no-project-accent)');
-  let onAccent = $derived(
-    selectedProject ? null : 'light-dark(#ffffff, #16161c)',
-  );
+  let onAccent = $derived(selectedProject ? null : 'light-dark(#ffffff, #16161c)');
 
   function pickProject(id) {
     draft.projectId = id;
@@ -131,18 +131,14 @@
   let assignedTags = $derived(tags.filter((t) => assigned.has(t.id)));
 
   function toggleTag(id) {
-    draft.tagIds = assigned.has(id)
-      ? draft.tagIds.filter((t) => t !== id)
-      : [...draft.tagIds, id];
+    draft.tagIds = assigned.has(id) ? draft.tagIds.filter((t) => t !== id) : [...draft.tagIds, id];
   }
 
   async function createTag(name) {
     // Reuse an existing tag with the same name (case-insensitive) if present.
     // A genuinely new tag must be created server-side now to obtain its id; only
     // its assignment to this entry is deferred to close like every other edit.
-    const existing = tags.find(
-      (t) => t.name.toLowerCase() === name.toLowerCase(),
-    );
+    const existing = tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
     const tag = existing ?? (await onCreateTag?.(name));
     if (tag && !assigned.has(tag.id)) {
       draft.tagIds = [...draft.tagIds, tag.id];
@@ -152,9 +148,7 @@
 
   function isoToTimeInput(iso) {
     const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(
-      d.getMinutes(),
-    ).padStart(2, '0')}`;
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
   function timeInputToISO(value, referenceISO) {
@@ -252,12 +246,7 @@
         <span class="ro-none">No tags</span>
       {/if}
     {:else}
-      <TagCombobox
-        {tags}
-        selectedIds={draft.tagIds}
-        onToggle={toggleTag}
-        onCreate={createTag}
-      />
+      <TagCombobox {tags} selectedIds={draft.tagIds} onToggle={toggleTag} onCreate={createTag} />
     {/if}
   </div>
 
@@ -266,16 +255,14 @@
       type="time"
       value={isoToTimeInput(draft.start)}
       readonly={readOnly}
-      onchange={(e) =>
-        (draft.start = timeInputToISO(e.currentTarget.value, draft.start))}
+      onchange={(e) => (draft.start = timeInputToISO(e.currentTarget.value, draft.start))}
     />
     <span>–</span>
     <input
       type="time"
       value={draft.end ? isoToTimeInput(draft.end) : ''}
       readonly={readOnly}
-      onchange={(e) =>
-        (draft.end = timeInputToISO(e.currentTarget.value, draft.start))}
+      onchange={(e) => (draft.end = timeInputToISO(e.currentTarget.value, draft.start))}
     />
   </div>
 
@@ -283,9 +270,7 @@
     {#if readOnly}
       <span class="ro-note">Read-only</span>
     {:else if running}
-      <button class="stop-btn" type="button" onclick={() => onStop?.()}>
-        Stop
-      </button>
+      <button class="stop-btn" type="button" onclick={() => onStop?.()}> Stop </button>
     {:else}
       <button
         class="delete"
@@ -298,7 +283,14 @@
         Delete
       </button>
     {/if}
-    <button class="done" type="button" onclick={() => { commit(); onClose?.(); }}>
+    <button
+      class="done"
+      type="button"
+      onclick={() => {
+        commit();
+        onClose?.();
+      }}
+    >
       {readOnly ? 'Close' : 'Done'}
     </button>
   </div>

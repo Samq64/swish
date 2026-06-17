@@ -16,9 +16,7 @@ export function entryColor(entry, projectsById, fallback = 'var(--no-project)') 
 
 /** Names of the tags assigned to an entry (skips any that no longer exist). */
 export function entryTagNames(entry, tagsById) {
-  return (entry?.tagIds ?? [])
-    .map((id) => tagsById.get(id)?.name)
-    .filter(Boolean);
+  return (entry?.tagIds ?? []).map((id) => tagsById.get(id)?.name).filter(Boolean);
 }
 
 /** Duration of a completed entry, in minutes. */

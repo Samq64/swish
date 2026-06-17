@@ -15,7 +15,7 @@
     dragging = false,
     running = false,
     hour12 = true,
-    onGrab,
+    onGrab = undefined,
   } = $props();
 
   let top = $derived(minutesToPx(block.startMin));

@@ -8,7 +8,7 @@
    * `footer` snippet for primary actions — modals whose × is the only way out
    * just omit it.
    */
-  let { title, width = 460, onClose, children, footer } = $props();
+  let { title, width = 460, onClose, children, footer = undefined } = $props();
 
   function onKeydown(event) {
     if (event.key === 'Escape') onClose?.();
@@ -24,13 +24,7 @@
     if (e.target === e.currentTarget) onClose?.();
   }}
 >
-  <div
-    class="modal"
-    style:width="{width}px"
-    role="dialog"
-    aria-modal="true"
-    aria-label={title}
-  >
+  <div class="modal" style:width="{width}px" role="dialog" aria-modal="true" aria-label={title}>
     <header class="head">
       <h2>{title}</h2>
       <button class="close" aria-label="Close" onclick={() => onClose?.()}>

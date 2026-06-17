@@ -8,7 +8,7 @@ export function load({ locals }) {
 
 export const actions = {
   default: async ({ request, cookies, platform }) => {
-    const env = platform.env;
+    const env = /** @type {App.Platform} */ (platform).env;
     const form = await request.formData();
     const username = (form.get('username') ?? '').toString().trim();
     const password = (form.get('password') ?? '').toString();
@@ -27,15 +27,15 @@ export const actions = {
     const userId = crypto.randomUUID();
     const wsId = crypto.randomUUID();
     await env.DB.batch([
-      env.DB
-        .prepare(
-          `INSERT INTO users (id, username, pw_hash, pw_salt, pw_iterations, active_workspace_id, created_at)
+      env.DB.prepare(
+        `INSERT INTO users (id, username, pw_hash, pw_salt, pw_iterations, active_workspace_id, created_at)
            VALUES (?,?,?,?,?,?,?)`,
-        )
-        .bind(userId, username, pw.hash, pw.salt, pw.iterations, wsId, new Date().toISOString()),
-      env.DB
-        .prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)')
-        .bind(wsId, userId, 'Personal'),
+      ).bind(userId, username, pw.hash, pw.salt, pw.iterations, wsId, new Date().toISOString()),
+      env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(
+        wsId,
+        userId,
+        'Personal',
+      ),
     ]);
 
     setSessionCookie(cookies, await createSession(env, userId));

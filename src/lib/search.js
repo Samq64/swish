@@ -3,9 +3,7 @@
 /** Items whose `name` contains `query` (all items when the query is blank). */
 export function filterByName(items, query) {
   const needle = query.trim().toLowerCase();
-  return needle
-    ? items.filter((i) => i.name.toLowerCase().includes(needle))
-    : items;
+  return needle ? items.filter((i) => i.name.toLowerCase().includes(needle)) : items;
 }
 
 /** Whether any item's `name` equals `query` exactly (case-insensitive). */

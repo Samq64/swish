@@ -1,4 +1,11 @@
-import { startOfDay, startOfWeek, addDays, fromDateInput, toDateInput, DAY_MS } from '../lib/time.js';
+import {
+  startOfDay,
+  startOfWeek,
+  addDays,
+  fromDateInput,
+  toDateInput,
+  DAY_MS,
+} from '../lib/time.js';
 
 // Past this many days a day-bucketed report chart has too many bars to read, so
 // it switches to monthly buckets (matches the Year preset's granularity).
@@ -23,14 +30,19 @@ export class AppStore {
   workspaces = $state([]);
   /**
    * Workspaces other users have shared with this user (read-only manager view).
-   * Each is { id, name, ownerUsername }.
+   * @type {Array<{ id: string, name: string, ownerUsername: string }>}
    */
   sharedWorkspaces = $state([]);
-  /** The user's role on their single active team: 'manager' | 'member' | null. */
+  /** The user's role on their single active team.
+   *  @type {'manager' | 'member' | null} */
   teamRole = $state(null);
-  /** Id of the workspace whose data is currently loaded. */
+  /** Id of the workspace whose data is currently loaded.
+   *  @type {string | null} */
   currentWorkspaceId = $state(null);
-  /** The signed-in user ({ username }), or null when logged out. */
+  /**
+   * The signed-in user, or null when logged out.
+   * @type {{ username: string } | null}
+   */
   currentUser = $state(null);
   /** False until the initial session check resolves (avoids a login flash). */
   ready = $state(false);
@@ -54,8 +66,10 @@ export class AppStore {
   reportFrom = $state(toDateInput(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
   reportTo = $state(toDateInput(new Date()));
   loading = $state(false);
-  /** The from/to that the current `entries` array was loaded for. */
+  /** The from/to that the current `entries` array was loaded for.
+   *  @type {string | null} */
   loadedRangeStart = $state(null);
+  /** @type {string | null} */
   loadedRangeEnd = $state(null);
 
   #repo;
@@ -142,7 +156,7 @@ export class AppStore {
         // Guard an inverted range (to before from) by collapsing to a single day.
         const end = fromDateInput(this.reportTo);
         const to = addDays(end >= from ? end : from, 1);
-        const span = Math.round((to - from) / DAY_MS);
+        const span = Math.round((to.getTime() - from.getTime()) / DAY_MS);
         return { from, to, unit: span > REPORT_MONTH_BUCKET_THRESHOLD ? 'month' : 'day' };
       }
       case 'week':
@@ -164,6 +178,19 @@ export class AppStore {
    * workspaces and the active workspace's projects/tags arrive with the page,
    * so there's no client-side bootstrap waterfall. Entries depend on the local
    * date range, which the server can't know, so they're fetched here.
+   *
+   * @param {{
+   *   username: string,
+   *   theme?: 'auto'|'light'|'dark',
+   *   weekStart?: 0|1,
+   *   hour12?: boolean,
+   *   workspaces: import('./repository.js').Workspace[],
+   *   sharedWorkspaces?: Array<{ id: string, name: string, ownerUsername: string }>,
+   *   teamRole?: 'manager'|'member'|null,
+   *   activeWorkspaceId: string|null,
+   *   projects: import('./repository.js').Project[],
+   *   tags: import('./repository.js').Tag[],
+   * }} data
    */
   hydrate({
     username,
@@ -472,9 +499,7 @@ export class AppStore {
 
   update(id, patch) {
     this.#assertWritable();
-    return this.#patch('entries', id, patch, (i, p) =>
-      this.#repo.updateEntry(i, p),
-    );
+    return this.#patch('entries', id, patch, (i, p) => this.#repo.updateEntry(i, p));
   }
 
   async remove(id) {
@@ -521,9 +546,7 @@ export class AppStore {
     const prevEntries = this.entries;
     this.projects = prevProjects.filter((p) => p.id !== id);
     // Detach the project from any entries that referenced it.
-    this.entries = prevEntries.map((e) =>
-      e.projectId === id ? { ...e, projectId: null } : e,
-    );
+    this.entries = prevEntries.map((e) => (e.projectId === id ? { ...e, projectId: null } : e));
     try {
       await this.#repo.deleteProject(id);
     } catch (e) {
@@ -547,9 +570,7 @@ export class AppStore {
 
   async updateTag(id, patch) {
     this.#assertWritable();
-    const saved = await this.#patch('tags', id, patch, (i, p) =>
-      this.#repo.updateTag(i, p),
-    );
+    const saved = await this.#patch('tags', id, patch, (i, p) => this.#repo.updateTag(i, p));
     if ('name' in patch) this.tags = AppStore.#sortByName(this.tags);
     return saved;
   }
@@ -561,9 +582,7 @@ export class AppStore {
     this.tags = prevTags.filter((t) => t.id !== id);
     // Detach the tag from any loaded entries that referenced it.
     this.entries = prevEntries.map((e) =>
-      e.tagIds?.includes(id)
-        ? { ...e, tagIds: e.tagIds.filter((t) => t !== id) }
-        : e,
+      e.tagIds?.includes(id) ? { ...e, tagIds: e.tagIds.filter((t) => t !== id) } : e,
     );
     try {
       await this.#repo.deleteTag(id);

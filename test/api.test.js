@@ -92,7 +92,16 @@ before(async () => {
   );
   server = spawn(
     'npx',
-    ['wrangler', 'pages', 'dev', '.svelte-kit/cloudflare', '--port', String(PORT), '--persist-to', STATE],
+    [
+      'wrangler',
+      'pages',
+      'dev',
+      '.svelte-kit/cloudflare',
+      '--port',
+      String(PORT),
+      '--persist-to',
+      STATE,
+    ],
     { stdio: 'ignore' },
   );
   const deadline = Date.now() + 60_000;
@@ -253,9 +262,13 @@ test('a second user cannot read or write the first user’s data', async () => {
   const own = await api('GET', '/api/workspaces', { cookie: bob });
   assert.notEqual(own.json[0].id, workspace);
 
-  const read = await api('GET', `/api/entries?workspaceId=${workspace}&from=${TODAY}&to=${TOMORROW}`, {
-    cookie: bob,
-  });
+  const read = await api(
+    'GET',
+    `/api/entries?workspaceId=${workspace}&from=${TODAY}&to=${TOMORROW}`,
+    {
+      cookie: bob,
+    },
+  );
   assert.equal(read.status, 403);
 
   const write = await api('POST', '/api/projects', {
@@ -272,24 +285,33 @@ test("teams: the manager gets read-only access to members' shared workspaces by 
 
   // emp owns two workspaces: the default + a second.
   const empWs = (await api('GET', '/api/auth/me', { cookie: emp })).json.activeWorkspaceId;
-  const empSecond = (
-    await api('POST', '/api/workspaces', { cookie: emp, body: { name: 'Side' } })
-  ).json.id;
+  const empSecond = (await api('POST', '/api/workspaces', { cookie: emp, body: { name: 'Side' } }))
+    .json.id;
 
   // Two managers create two teams.
-  const teamId = (await api('POST', '/api/teams', { cookie: manager, body: { name: 'Squad' } })).json.id;
-  const team2 = (await api('POST', '/api/teams', { cookie: boss, body: { name: 'Other' } })).json.id;
+  const teamId = (await api('POST', '/api/teams', { cookie: manager, body: { name: 'Squad' } }))
+    .json.id;
+  const team2 = (await api('POST', '/api/teams', { cookie: boss, body: { name: 'Other' } })).json
+    .id;
 
   // A non-manager can't invite; the manager can. Both teams may invite emp while
   // emp is on no team (multiple pending invites are allowed).
   assert.equal(
-    (await api('POST', `/api/teams/${teamId}/invites`, { cookie: emp, body: { username: 'manager' } }))
-      .status,
+    (
+      await api('POST', `/api/teams/${teamId}/invites`, {
+        cookie: emp,
+        body: { username: 'manager' },
+      })
+    ).status,
     403,
   );
   assert.equal(
-    (await api('POST', `/api/teams/${teamId}/invites`, { cookie: manager, body: { username: 'emp' } }))
-      .status,
+    (
+      await api('POST', `/api/teams/${teamId}/invites`, {
+        cookie: manager,
+        body: { username: 'emp' },
+      })
+    ).status,
     200,
   );
   assert.equal(
@@ -322,15 +344,20 @@ test("teams: the manager gets read-only access to members' shared workspaces by 
 
   // Read access works; writes are refused (read-only).
   assert.equal(
-    (await api('GET', `/api/entries?workspaceId=${empWs}&from=${TODAY}&to=${TOMORROW}`, {
-      cookie: manager,
-    }))
-      .status,
+    (
+      await api('GET', `/api/entries?workspaceId=${empWs}&from=${TODAY}&to=${TOMORROW}`, {
+        cookie: manager,
+      })
+    ).status,
     200,
   );
   assert.equal(
-    (await api('POST', '/api/entries', { cookie: manager, body: { workspaceId: empWs, start: TODAY } }))
-      .status,
+    (
+      await api('POST', '/api/entries', {
+        cookie: manager,
+        body: { workspaceId: empWs, start: TODAY },
+      })
+    ).status,
     403,
   );
 
@@ -346,10 +373,11 @@ test("teams: the manager gets read-only access to members' shared workspaces by 
     [empWs],
   );
   assert.equal(
-    (await api('GET', `/api/entries?workspaceId=${empSecond}&from=${TODAY}&to=${TOMORROW}`, {
-      cookie: manager,
-    }))
-      .status,
+    (
+      await api('GET', `/api/entries?workspaceId=${empSecond}&from=${TODAY}&to=${TOMORROW}`, {
+        cookie: manager,
+      })
+    ).status,
     403,
   );
 
@@ -360,7 +388,9 @@ test("teams: the manager gets read-only access to members' shared workspaces by 
   // emp leaves freely; the manager's shared list empties but emp keeps everything.
   assert.equal((await api('POST', `/api/teams/${teamId}/leave`, { cookie: emp })).status, 204);
   assert.deepEqual((await api('GET', '/api/shared', { cookie: manager })).json, []);
-  assert.ok((await api('GET', '/api/workspaces', { cookie: emp })).json.some((w) => w.id === empWs));
+  assert.ok(
+    (await api('GET', '/api/workspaces', { cookie: emp })).json.some((w) => w.id === empWs),
+  );
 
   // Founder deletes the team; emp's data is untouched.
   assert.equal((await api('DELETE', `/api/teams/${teamId}`, { cookie: manager })).status, 204);

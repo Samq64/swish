@@ -10,6 +10,7 @@ function nowMinute() {
 
 class Clock {
   minute = $state(nowMinute());
+  /** @type {ReturnType<typeof setInterval> | null} */
   #timer = null;
   #refs = 0;
 
@@ -19,7 +20,7 @@ class Clock {
       this.#timer = setInterval(() => (this.minute = nowMinute()), 30_000);
     }
     return () => {
-      if (--this.#refs === 0) {
+      if (--this.#refs === 0 && this.#timer != null) {
         clearInterval(this.#timer);
         this.#timer = null;
       }

@@ -117,6 +117,7 @@
     // last stable value so we don't briefly show a too-small total.
     const covered =
       store.loadedRangeStart !== null &&
+      store.loadedRangeEnd !== null &&
       new Date(store.loadedRangeStart).getTime() <= from &&
       new Date(store.loadedRangeEnd).getTime() >= to;
     if (!covered) return stableTotalMin;
@@ -141,177 +142,176 @@
 {#if !store.ready}
   <!-- Loading the signed-in user's data; hooks.server.js already gated access. -->
 {:else}
-<header class="topbar">
-  <WorkspaceSelector
-    onOpenSettings={() => (showSettings = true)}
-    onManageWorkspaces={() => (showWorkspaces = true)}
-    onOpenTeam={() => (showTeam = true)}
-  />
-  <div class="timer-slot">
-    {#if store.readOnly}
-      <div class="readonly-banner" role="status">
-        <Icon name="users" size={15} />
-        <span>Read-only{sharedOwner ? ` · shared by ${sharedOwner}` : ''}</span>
-      </div>
-    {:else}
-      <TimerBar />
-    {/if}
-  </div>
-  <div class="topbar-actions">
-    <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
-    <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
-  </div>
-</header>
+  <header class="topbar">
+    <WorkspaceSelector
+      onOpenSettings={() => (showSettings = true)}
+      onManageWorkspaces={() => (showWorkspaces = true)}
+      onOpenTeam={() => (showTeam = true)}
+    />
+    <div class="timer-slot">
+      {#if store.readOnly}
+        <div class="readonly-banner" role="status">
+          <Icon name="users" size={15} />
+          <span>Read-only{sharedOwner ? ` · shared by ${sharedOwner}` : ''}</span>
+        </div>
+      {:else}
+        <TimerBar />
+      {/if}
+    </div>
+    <div class="topbar-actions">
+      <button class="nav-btn" onclick={() => (showProjects = true)}>Projects</button>
+      <button class="nav-btn" onclick={() => (showTags = true)}>Tags</button>
+    </div>
+  </header>
 
-<nav class="day-nav">
-  <!-- Reports has its own range, so the timeline's date controls and week total
+  <nav class="day-nav">
+    <!-- Reports has its own range, so the timeline's date controls and week total
        don't apply; a range dropdown (+ date pickers when Custom) takes their place. -->
-  {#if store.view === 'reports'}
-    <div class="nav-left">
-      <span class="control-label" id="range-label">Range</span>
-      <div class="range-picker" use:clickOutside={() => (rangeOpen = false)}>
-        <button
-          class="range-trigger"
-          aria-haspopup="listbox"
-          aria-expanded={rangeOpen}
-          aria-labelledby="range-label"
-          onclick={() => (rangeOpen = !rangeOpen)}
-        >
-          <span>{reportPresetLabel}</span>
-          <span class="caret" class:open={rangeOpen}><Icon name="chevron-down" size={16} /></span>
-        </button>
+    {#if store.view === 'reports'}
+      <div class="nav-left">
+        <span class="control-label" id="range-label">Range</span>
+        <div class="range-picker" use:clickOutside={() => (rangeOpen = false)}>
+          <button
+            class="range-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={rangeOpen}
+            aria-labelledby="range-label"
+            onclick={() => (rangeOpen = !rangeOpen)}
+          >
+            <span>{reportPresetLabel}</span>
+            <span class="caret" class:open={rangeOpen}><Icon name="chevron-down" size={16} /></span>
+          </button>
 
-        {#if rangeOpen}
-          <div class="range-panel dropdown-panel" role="listbox" aria-labelledby="range-label">
-            {#each REPORT_PRESETS as p (p.key)}
-              {@const current = store.reportPreset === p.key}
-              <button
-                class="range-option"
-                class:current
-                role="option"
-                aria-selected={current}
-                onclick={() => {
-                  store.reportPreset = p.key;
-                  rangeOpen = false;
-                }}
-              >
-                <span class="check">{#if current}<Icon name="check" size={14} />{/if}</span>
-                {p.label}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+          {#if rangeOpen}
+            <div class="range-panel dropdown-panel" role="listbox" aria-labelledby="range-label">
+              {#each REPORT_PRESETS as p (p.key)}
+                {@const current = store.reportPreset === p.key}
+                <button
+                  class="range-option"
+                  class:current
+                  role="option"
+                  aria-selected={current}
+                  onclick={() => {
+                    store.reportPreset = p.key;
+                    rangeOpen = false;
+                  }}
+                >
+                  <span class="check"
+                    >{#if current}<Icon name="check" size={14} />{/if}</span
+                  >
+                  {p.label}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
 
-      <!-- Always rendered (width-collapsed off-custom) so the row reserves the
+        <!-- Always rendered (width-collapsed off-custom) so the row reserves the
            date inputs' native height and switching to Custom doesn't shift the
            layout — the inputs are taller than the trigger by a couple of pixels. -->
-      <div class="custom-range" class:reserved={store.reportPreset !== 'custom'}>
-        <input
-          class="date-input"
-          type="date"
-          aria-label="From date"
-          max={store.reportTo}
-          value={store.reportFrom}
-          onchange={(e) => (store.reportFrom = e.currentTarget.value || store.reportFrom)}
-        />
-        <span class="dash">–</span>
-        <input
-          class="date-input"
-          type="date"
-          aria-label="To date"
-          min={store.reportFrom}
-          value={store.reportTo}
-          onchange={(e) => (store.reportTo = e.currentTarget.value || store.reportTo)}
-        />
+        <div class="custom-range" class:reserved={store.reportPreset !== 'custom'}>
+          <input
+            class="date-input"
+            type="date"
+            aria-label="From date"
+            max={store.reportTo}
+            value={store.reportFrom}
+            onchange={(e) => (store.reportFrom = e.currentTarget.value || store.reportFrom)}
+          />
+          <span class="dash">–</span>
+          <input
+            class="date-input"
+            type="date"
+            aria-label="To date"
+            min={store.reportFrom}
+            value={store.reportTo}
+            onchange={(e) => (store.reportTo = e.currentTarget.value || store.reportTo)}
+          />
+        </div>
+
+        {#if store.reportPreset !== 'custom'}
+          <h2 class="range-label">{reportRangeLabel}</h2>
+        {/if}
       </div>
+    {:else}
+      <div class="nav-left">
+        <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
+          <Icon name="chevron-left" />
+        </button>
+        <input
+          class="date-input"
+          type="date"
+          aria-label="Go to date"
+          value={anchorInput}
+          onchange={(e) => pickDate(e.currentTarget.value)}
+        />
+        <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
+          <Icon name="chevron-right" />
+        </button>
 
-      {#if store.reportPreset !== 'custom'}
-        <h2 class="range-label">{reportRangeLabel}</h2>
-      {/if}
-    </div>
-  {:else}
-    <div class="nav-left">
-      <button class="nav-btn" aria-label="Previous" onclick={() => store.shift(-1)}>
-        <Icon name="chevron-left" />
-      </button>
-      <input
-        class="date-input"
-        type="date"
-        aria-label="Go to date"
-        value={anchorInput}
-        onchange={(e) => pickDate(e.currentTarget.value)}
-      />
-      <button class="nav-btn" aria-label="Next" onclick={() => store.shift(1)}>
-        <Icon name="chevron-right" />
-      </button>
+        {#if store.view !== 'day'}
+          <h2 class="range-label">{rangeLabel}</h2>
+        {/if}
+        <span class="total">{formatDuration(totalMin)} tracked</span>
+      </div>
+    {/if}
 
-      {#if store.view !== 'day'}
-        <h2 class="range-label">{rangeLabel}</h2>
-      {/if}
-      <span class="total">{formatDuration(totalMin)} tracked</span>
+    <div
+      class="seg"
+      role="group"
+      aria-label="View"
+      style="--seg-active: {store.view === 'week'
+        ? 0
+        : store.view === 'day'
+          ? 1
+          : store.view === 'list'
+            ? 2
+            : 3}; --seg-count: 4"
+    >
+      <button class:active={store.view === 'week'} onclick={() => store.setView('week')}>
+        Week
+      </button>
+      <button class:active={store.view === 'day'} onclick={() => store.setView('day')}>
+        Day
+      </button>
+      <button class:active={store.view === 'list'} onclick={() => store.setView('list')}>
+        List
+      </button>
+      <button class:active={store.view === 'reports'} onclick={() => store.setView('reports')}>
+        Reports
+      </button>
     </div>
+  </nav>
+
+  <main class="fill-col view-host">
+    {#key store.view}
+      <div class="fill-col view-layer" in:fade={{ duration: 160 }} out:fade={{ duration: 160 }}>
+        {#if store.view === 'list'}
+          <ListView />
+        {:else if store.view === 'reports'}
+          <ReportsView />
+        {:else}
+          <TimelineView />
+        {/if}
+      </div>
+    {/key}
+  </main>
+
+  {#if showProjects}
+    <ProjectsModal onClose={() => (showProjects = false)} />
   {/if}
-
-  <div
-    class="seg"
-    role="group"
-    aria-label="View"
-    style="--seg-active: {store.view === 'week' ? 0 : store.view === 'day' ? 1 : store.view === 'list' ? 2 : 3}; --seg-count: 4"
-  >
-    <button
-      class:active={store.view === 'week'}
-      onclick={() => store.setView('week')}
-    >
-      Week
-    </button>
-    <button class:active={store.view === 'day'} onclick={() => store.setView('day')}>
-      Day
-    </button>
-    <button
-      class:active={store.view === 'list'}
-      onclick={() => store.setView('list')}
-    >
-      List
-    </button>
-    <button
-      class:active={store.view === 'reports'}
-      onclick={() => store.setView('reports')}
-    >
-      Reports
-    </button>
-  </div>
-</nav>
-
-<main class="fill-col view-host">
-  {#key store.view}
-    <div class="fill-col view-layer" in:fade={{ duration: 160 }} out:fade={{ duration: 160 }}>
-      {#if store.view === 'list'}
-        <ListView />
-      {:else if store.view === 'reports'}
-        <ReportsView />
-      {:else}
-        <TimelineView />
-      {/if}
-    </div>
-  {/key}
-</main>
-
-{#if showProjects}
-  <ProjectsModal onClose={() => (showProjects = false)} />
-{/if}
-{#if showTags}
-  <TagsModal onClose={() => (showTags = false)} />
-{/if}
-{#if showSettings}
-  <SettingsModal onClose={() => (showSettings = false)} />
-{/if}
-{#if showWorkspaces}
-  <WorkspacesModal onClose={() => (showWorkspaces = false)} />
-{/if}
-{#if showTeam}
-  <TeamModal onClose={() => (showTeam = false)} />
-{/if}
+  {#if showTags}
+    <TagsModal onClose={() => (showTags = false)} />
+  {/if}
+  {#if showSettings}
+    <SettingsModal onClose={() => (showSettings = false)} />
+  {/if}
+  {#if showWorkspaces}
+    <WorkspacesModal onClose={() => (showWorkspaces = false)} />
+  {/if}
+  {#if showTeam}
+    <TeamModal onClose={() => (showTeam = false)} />
+  {/if}
 {/if}
 
 <style>

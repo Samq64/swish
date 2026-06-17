@@ -9,9 +9,11 @@
     import: 'default',
     eager: true,
   });
+  /** @type {Record<string, string>} */
   const icons = {};
   for (const [path, svg] of Object.entries(files)) {
-    icons[path.split('/').pop().replace('.svg', '')] = svg;
+    const key = path.split('/').pop()?.replace('.svg', '');
+    if (key) icons[key] = /** @type {string} */ (svg);
   }
 
   let { name, size = 18, class: klass = '' } = $props();

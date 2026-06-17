@@ -16,9 +16,10 @@ import {
 export const ssr = false;
 
 export async function load({ locals, platform }) {
-  // hooks.server.js has already gated this route, so locals.user is present.
-  const { user } = locals;
-  const env = platform.env;
+  // hooks.server.js has already gated this route, so locals.user is present,
+  // and the Cloudflare adapter always provides `platform`.
+  const user = /** @type {NonNullable<App.Locals['user']>} */ (locals.user);
+  const env = /** @type {App.Platform} */ (platform).env;
 
   const [workspaces, sharedWorkspaces, teamRole] = await Promise.all([
     listWorkspaces(env, user.id),
@@ -31,7 +32,7 @@ export async function load({ locals, platform }) {
   const accessibleIds = new Set([...workspaces, ...sharedWorkspaces].map((w) => w.id));
   const activeWorkspaceId = accessibleIds.has(user.activeWorkspaceId)
     ? user.activeWorkspaceId
-    : workspaces[0]?.id ?? null;
+    : (workspaces[0]?.id ?? null);
 
   // projects/tags are id-scoped; access to activeWorkspaceId was validated when
   // it was set (see PUT /settings/active-workspace), so this is safe for shared

@@ -49,8 +49,7 @@
           value={p.color}
           aria-label="Colour for {p.name}"
           disabled={store.readOnly}
-          onchange={(e) =>
-            store.updateProject(p.id, { color: e.currentTarget.value })}
+          onchange={(e) => store.updateProject(p.id, { color: e.currentTarget.value })}
         />
 
         {#if !store.readOnly}
@@ -73,8 +72,7 @@
           value={p.name}
           placeholder="Project name"
           readonly={store.readOnly}
-          onchange={(e) =>
-            store.updateProject(p.id, { name: e.currentTarget.value })}
+          onchange={(e) => store.updateProject(p.id, { name: e.currentTarget.value })}
         />
 
         {#if !store.readOnly}

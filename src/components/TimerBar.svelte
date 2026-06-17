@@ -5,6 +5,9 @@
 
   let description = $state('');
   let descInput;
+
+  let running = $derived(store.runningEntry);
+
   // A timer needs a description before it can start; manual drag-created entries
   // (on the timeline) don't, by design.
   let canStart = $derived(!!running || description.trim() !== '');
@@ -16,11 +19,7 @@
     return () => clearInterval(t);
   });
 
-  let running = $derived(store.runningEntry);
-
-  let elapsedMin = $derived(
-    running ? (now - new Date(running.start).getTime()) / 60000 : 0,
-  );
+  let elapsedMin = $derived(running ? (now - new Date(running.start).getTime()) / 60000 : 0);
 
   // Sync description from the running entry; clear when there's none (handles
   // workspace switches where the running entry changes or disappears).

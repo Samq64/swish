@@ -11,6 +11,7 @@
   let isLogin = $derived(mode === 'login');
   let title = $derived(isLogin ? 'Welcome back' : 'Create your account');
   let submit = $derived(isLogin ? 'Sign in' : 'Sign up');
+  /** @type {'current-password' | 'new-password'} */
   let pwAutocomplete = $derived(isLogin ? 'current-password' : 'new-password');
   let switchText = $derived(isLogin ? 'New here?' : 'Already have an account?');
   let switchHref = $derived(isLogin ? '/register' : '/login');

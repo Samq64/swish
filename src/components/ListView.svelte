@@ -14,7 +14,9 @@
   let selectedId = $state(null);
   // The clicked row's rect, in the `anchor` shape EditPopover positions against
   // (it has no `pos` prop). `bounds` is the on-screen region the editor may fill.
+  /** @type {{ left: number, right: number, top: number, bottom: number, width: number, height: number, contentRight: number } | null} */
   let anchor = $state(null);
+  /** @type {{ top: number, bottom: number } | null} */
   let bounds = $state(null);
   /** @type {Set<string>} */
   let filterTagIds = $state(new Set());
@@ -46,18 +48,12 @@
       .map((dayISO) => {
         let entries = store.entriesForDay(dayISO).filter((e) => e.end);
         if (filterProjectIds.size) {
-          entries = entries.filter((e) =>
-            filterProjectIds.has(e.projectId ?? NO_PROJECT),
-          );
+          entries = entries.filter((e) => filterProjectIds.has(e.projectId ?? NO_PROJECT));
         }
         if (filterTagIds.size) {
-          entries = entries.filter((e) =>
-            (e.tagIds ?? []).some((id) => filterTagIds.has(id)),
-          );
+          entries = entries.filter((e) => (e.tagIds ?? []).some((id) => filterTagIds.has(id)));
         }
-        entries = entries.sort(
-          (a, b) => new Date(b.start).getTime() - new Date(a.start).getTime(),
-        );
+        entries = entries.sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
         const total = entries.reduce((s, e) => s + entryDurationMin(e), 0);
         return { dayISO, entries, total };
       })
@@ -141,9 +137,7 @@
 
     <!-- Always rendered (visibility-toggled) so toggling filters never shifts
          the list vertically. -->
-    <button class="clear" class:invisible={!anyFilter} onclick={clearFilters}>
-      Clear all
-    </button>
+    <button class="clear" class:invisible={!anyFilter} onclick={clearFilters}> Clear all </button>
   </div>
 
   <div class="scroll">
@@ -156,11 +150,12 @@
 
         {#each g.entries as e (e.id)}
           {@const project = entryProject(e, store.projectsById)}
-          <button class="row" class:selected={selectedId === e.id} onclick={(ev) => select(e.id, ev)}>
-            <span
-              class="dot"
-              style:background={project?.color ?? 'var(--no-project)'}
-            ></span>
+          <button
+            class="row"
+            class:selected={selectedId === e.id}
+            onclick={(ev) => select(e.id, ev)}
+          >
+            <span class="dot" style:background={project?.color ?? 'var(--no-project)'}></span>
             <span class="desc">{e.description || 'No description'}</span>
 
             <span class="tags">
@@ -189,9 +184,7 @@
 
     {#if groups.length === 0}
       <p class="empty">
-        {anyFilter
-          ? 'No entries match the selected filters.'
-          : 'No entries in this range yet.'}
+        {anyFilter ? 'No entries match the selected filters.' : 'No entries in this range yet.'}
       </p>
     {/if}
   </div>

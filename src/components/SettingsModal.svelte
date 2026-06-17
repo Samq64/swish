@@ -33,7 +33,7 @@
       newPassword = '';
       pwOk = true;
     } catch (e) {
-      pwError = e?.message || 'Could not update password.';
+      pwError = e instanceof Error ? e.message : 'Could not update password.';
     } finally {
       pwBusy = false;
     }
@@ -53,14 +53,13 @@
   async function deleteAccount() {
     if (deleteBusy) return;
     deleteError = '';
-    if (!confirm('Delete your account and everything in it? This cannot be undone.'))
-      return;
+    if (!confirm('Delete your account and everything in it? This cannot be undone.')) return;
     deleteBusy = true;
     try {
       await store.deleteAccount(deletePassword);
       // Success drops to the login screen and unmounts this modal.
     } catch (e) {
-      deleteError = e?.message || 'Could not delete account.';
+      deleteError = e instanceof Error ? e.message : 'Could not delete account.';
       deleteBusy = false;
     }
   }
@@ -76,7 +75,11 @@
           class="seg"
           role="group"
           aria-label="Theme"
-          style="--seg-active: {store.theme === 'auto' ? 0 : store.theme === 'light' ? 1 : 2}; --seg-count: 3"
+          style="--seg-active: {store.theme === 'auto'
+            ? 0
+            : store.theme === 'light'
+              ? 1
+              : 2}; --seg-count: 3"
         >
           {#each ['auto', 'light', 'dark'] as t (t)}
             <button class:active={store.theme === t} onclick={() => store.setTheme(t)}>
@@ -159,8 +162,8 @@
     <section class="section danger">
       <h3>Delete account</h3>
       <p class="hint">
-        Permanently deletes your account and all workspaces, projects, tags
-        and entries. This cannot be undone.
+        Permanently deletes your account and all workspaces, projects, tags and entries. This cannot
+        be undone.
       </p>
       <input
         type="password"

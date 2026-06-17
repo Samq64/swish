@@ -47,7 +47,7 @@
       inviteName[teamId] = '';
       await reload();
     } catch (e) {
-      alert(e?.message ?? 'Could not send the invite.');
+      alert(e instanceof Error ? e.message : 'Could not send the invite.');
     }
   }
 
@@ -107,7 +107,11 @@
             <h3>{team.name}</h3>
             <span class="role">{team.role === 'manager' ? 'Manager' : 'Member'}</span>
             {#if team.role === 'manager'}
-              <button class="icon-btn danger" aria-label="Delete team" onclick={() => deleteTeam(team)}>
+              <button
+                class="icon-btn danger"
+                aria-label="Delete team"
+                onclick={() => deleteTeam(team)}
+              >
                 <Icon name="trash-2" size={15} />
               </button>
             {:else}

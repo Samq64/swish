@@ -12,6 +12,7 @@
  * @typedef {Object} Workspace
  * @property {string} id
  * @property {string} name
+ * @property {boolean} [shared]  Whether it's shared with the team (owned workspaces only)
  *
  * @typedef {Object} TimeEntry
  * @property {string}  id

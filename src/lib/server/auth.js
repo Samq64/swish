@@ -63,12 +63,7 @@ export async function hashPassword(password, pepper) {
 /** Constant-time verification against a stored { hash, salt, iterations }. */
 export async function verifyPassword(password, stored, pepper) {
   const expected = b64urlDecode(stored.hash);
-  const actual = await deriveBits(
-    password,
-    b64urlDecode(stored.salt),
-    stored.iterations,
-    pepper,
-  );
+  const actual = await deriveBits(password, b64urlDecode(stored.salt), stored.iterations, pepper);
   return timingSafeEqual(actual, expected);
 }
 

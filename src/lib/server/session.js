@@ -44,9 +44,9 @@ export async function createSession(env, userId) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   await env.DB.batch([
-    env.DB
-      .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)')
-      .bind(id, userId, nowIso, new Date(now + SESSION_TTL_MS).toISOString()),
+    env.DB.prepare(
+      'INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)',
+    ).bind(id, userId, nowIso, new Date(now + SESSION_TTL_MS).toISOString()),
     // Opportunistically reap expired sessions (indexed by expires_at). Pages has
     // no cron trigger; a dedicated scheduled Worker would be the alternative.
     env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(nowIso),
@@ -57,7 +57,9 @@ export async function createSession(env, userId) {
 /** Delete the session backing `token` (if any). */
 export async function destroySession(env, token) {
   if (!token) return;
-  await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(await sha256b64url(token)).run();
+  await env.DB.prepare('DELETE FROM sessions WHERE id = ?')
+    .bind(await sha256b64url(token))
+    .run();
 }
 
 export function setSessionCookie(cookies, token) {

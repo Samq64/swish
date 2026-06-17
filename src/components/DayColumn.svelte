@@ -73,11 +73,7 @@
       0,
       MINUTES_PER_DAY,
     );
-    const endMin = clamp(
-      (new Date(entry.end).getTime() - dayStart) / 60000,
-      0,
-      MINUTES_PER_DAY,
-    );
+    const endMin = clamp((new Date(entry.end).getTime() - dayStart) / 60000, 0, MINUTES_PER_DAY);
     return { id: entry.id, startMin, endMin };
   }
 
@@ -88,18 +84,12 @@
   // `movedHere`: a move that started elsewhere is now hovering this column, so
   // we render the live block ourselves (`movingBlock`).
   let movedAway = $derived(
-    drag?.mode === 'move' &&
-      drag.originDayISO === dayISO &&
-      drag.targetDayISO !== dayISO,
+    drag?.mode === 'move' && drag.originDayISO === dayISO && drag.targetDayISO !== dayISO,
   );
   let movedHere = $derived(
-    drag?.mode === 'move' &&
-      drag.targetDayISO === dayISO &&
-      drag.originDayISO !== dayISO,
+    drag?.mode === 'move' && drag.targetDayISO === dayISO && drag.originDayISO !== dayISO,
   );
-  let movingEntry = $derived(
-    movedHere ? store.entries.find((e) => e.id === drag.entryId) : null,
-  );
+  let movingEntry = $derived(movedHere ? store.entries.find((e) => e.id === drag.entryId) : null);
 
   /**
    * Completed entries as timeline blocks. `order` is the creation-order index,
@@ -173,11 +163,7 @@
   // with no sizing drag. The editor anchors itself to the new block.
   async function createDefaultEntry(clientY) {
     if (!gridEl) return;
-    const m = clamp(
-      pxToMinutes(clientY - gridEl.getBoundingClientRect().top),
-      0,
-      MINUTES_PER_DAY,
-    );
+    const m = clamp(pxToMinutes(clientY - gridEl.getBoundingClientRect().top), 0, MINUTES_PER_DAY);
     const start = clamp(snap(m), 0, MINUTES_PER_DAY - DEFAULT_CREATE_MIN);
     const entry = await store.create({
       description: '',
@@ -281,25 +267,13 @@
         drag.endMin = Math.max(drag.anchorMin, snapped);
         break;
       case 'resize-end':
-        drag.endMin = clamp(
-          Math.max(snapped, drag.startMin + MIN_DURATION),
-          0,
-          MINUTES_PER_DAY,
-        );
+        drag.endMin = clamp(Math.max(snapped, drag.startMin + MIN_DURATION), 0, MINUTES_PER_DAY);
         break;
       case 'resize-start':
-        drag.startMin = clamp(
-          Math.min(snapped, drag.endMin - MIN_DURATION),
-          0,
-          MINUTES_PER_DAY,
-        );
+        drag.startMin = clamp(Math.min(snapped, drag.endMin - MIN_DURATION), 0, MINUTES_PER_DAY);
         break;
       case 'move': {
-        const ns = clamp(
-          snap(m - drag.grabOffsetMin),
-          0,
-          MINUTES_PER_DAY - drag.duration,
-        );
+        const ns = clamp(snap(m - drag.grabOffsetMin), 0, MINUTES_PER_DAY - drag.duration);
         drag.startMin = ns;
         drag.endMin = ns + drag.duration;
         // Which day's column is the cursor over now? That's where it lands.
@@ -385,7 +359,9 @@
 <div
   class="grid"
   role="application"
-  aria-label="Timeline for {new Date(dayISO).toDateString()} — hold or drag to add an entry, drag edges to resize, drag body to move"
+  aria-label="Timeline for {new Date(
+    dayISO,
+  ).toDateString()} — hold or drag to add an entry, drag edges to resize, drag body to move"
   style:height="{minutesToPx(MINUTES_PER_DAY)}px"
   bind:this={gridEl}
   onpointerdown={beginCreate}
@@ -499,5 +475,4 @@
     border-radius: 50%;
     background: #e74c3c;
   }
-
 </style>
