@@ -1,0 +1,10 @@
+# Build output and generated files
+.svelte-kit/
+build/
+.wrangler/
+node_modules/
+
+# Lockfile and binary assets format themselves / shouldn't be reflowed
+package-lock.json
+src/lib/icons/
+static/

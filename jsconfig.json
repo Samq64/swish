@@ -1,0 +1,21 @@
+{
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    // The app is plain JS with JSDoc on the key contracts (the Repository
+    // shape, the store's reactive fields) rather than exhaustive annotations.
+    // `strict` minus `noImplicitAny` keeps the checks that catch real bugs —
+    // null/undefined access, wrong property names, bad assignments, stale
+    // types after a refactor — without demanding a type on every local.
+    "strict": true,
+    "noImplicitAny": false
+  },
+  // Tests are integration scaffolding run by node:test against a live server,
+  // not part of the typed app surface.
+  "exclude": ["test", "tests", "node_modules"]
+}
