@@ -143,6 +143,7 @@
     let audioData;
     try {
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+      audioChunks = []; // release the recorded buffers; we have the blob now
       audioData = await decodeToFloat32(await blob.arrayBuffer());
     } catch {
       showError('Audio decode failed');
@@ -188,10 +189,13 @@
     }, 3000);
   }
 
+  // One reusable decode context. Creating/closing an AudioContext per recording
+  // churns memory and can hit the browser's hard cap on live contexts.
+  let decodeCtx = null;
+
   async function decodeToFloat32(arrayBuffer) {
-    const ctx = new AudioContext();
-    const decoded = await ctx.decodeAudioData(arrayBuffer);
-    await ctx.close();
+    if (!decodeCtx || decodeCtx.state === 'closed') decodeCtx = new AudioContext();
+    const decoded = await decodeCtx.decodeAudioData(arrayBuffer);
 
     // Resample to 16 kHz mono — what Whisper expects
     const targetRate = 16_000;
@@ -201,7 +205,9 @@
     src.connect(offCtx.destination);
     src.start(0);
     const rendered = await offCtx.startRendering();
-    return rendered.getChannelData(0);
+    // Copy the samples out so the (large) AudioBuffer can be GC'd immediately and
+    // we transfer a standalone buffer to the worker rather than its backing store.
+    return new Float32Array(rendered.getChannelData(0));
   }
 
   function handleClick() {
@@ -218,10 +224,14 @@
   const fmtMB = (bytes) => (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0);
   let pct = $derived(totalBytes ? Math.min(100, Math.round((loadedBytes / totalBytes) * 100)) : 0);
 
-  // Release the mic and stop the detector if we unmount mid-recording.
+  // On unmount, release everything: mic, detector, decode context, and the
+  // worker (which holds the loaded model in memory).
   $effect(() => () => {
     stopVad();
     micStream?.getTracks().forEach((t) => t.stop());
+    decodeCtx?.close().catch(() => {});
+    worker?.terminate();
+    worker = null;
   });
 </script>
 
