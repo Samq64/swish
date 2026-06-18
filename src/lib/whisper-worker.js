@@ -1,7 +1,12 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // Run ONNX directly on this worker thread (no nested proxy worker)
-if (env.backends.onnx.wasm) env.backends.onnx.wasm.proxy = false;
+if (env.backends.onnx.wasm) {
+  env.backends.onnx.wasm.proxy = false;
+  // Cap threads: each WASM thread adds memory/overhead, and on mobile the extra
+  // pressure can crash the tab. Two is plenty for a tiny model.
+  env.backends.onnx.wasm.numThreads = Math.min(2, navigator.hardwareConcurrency || 2);
+}
 
 let transcriber = null;
 
@@ -14,7 +19,10 @@ async function getTranscriber() {
   const files = new Map();
 
   transcriber = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-tiny.en', {
-    dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    // Quantize both halves: the fp32 encoder is too memory-hungry for mobile and
+    // was crashing the tab (OOM). q8 encoder + q4 decoder keeps tiny.en accurate
+    // enough for short dictation while roughly halving the peak footprint.
+    dtype: { encoder_model: 'q8', decoder_model_merged: 'q4' },
     progress_callback(info) {
       // Only 'progress' events carry byte counts; 'done' just names the file,
       // so we settle that file to its known total. Other statuses are ignored.
