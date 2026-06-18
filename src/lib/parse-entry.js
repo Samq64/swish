@@ -15,7 +15,17 @@ import * as chrono from 'chrono-node';
 // Generic words that must NOT be enough, on their own, to pin an entry to a
 // project — otherwise "deep work on the API" matches a "Client Work" project.
 const STOPWORDS = new Set([
-  'the', 'and', 'for', 'with', 'work', 'stuff', 'task', 'time', 'some', 'this', 'that',
+  'the',
+  'and',
+  'for',
+  'with',
+  'work',
+  'stuff',
+  'task',
+  'time',
+  'some',
+  'this',
+  'that',
 ]);
 
 // Filler left clinging to the description once the time span is cut out.
@@ -47,8 +57,6 @@ function hasDayReference(matchedText) {
  *   Returns null when no time range is found — treat as a plain description input.
  */
 export function parseEntry(transcript, now, projects) {
-  // "between 8 and 8:45" → "8 to 8:45" so chrono reads it as one range. Only
-  // fires between time-like tokens, so descriptions ("between teams") are safe.
   const raw = normalizeCompactTimes(
     transcript
       .trim()
@@ -59,6 +67,9 @@ export function parseEntry(transcript, now, projects) {
       // `m\b` anchors on the m itself so a trailing dot is consumed cleanly and
       // words like "a memo" (m not its own token) are left alone.
       .replace(/\b([ap])\.?\s+m\b\.?/gi, '$1m')
+      // Slang range connectors chrono doesn't know → ones it does.
+      .replace(/\bthru\b/gi, 'through')
+      .replace(/\btill?\b/gi, 'until'),
   );
 
   // First pass on the verbatim text keeps a clean description (no digit
@@ -173,10 +184,13 @@ function normalizeCompactTimes(s) {
       const t = toHM(d);
       return t ? t + sep : m;
     })
-    .replace(new RegExp(String.raw`((?:\b(?:${RANGE}|from)\b)\s*)(\d{3,4})\b`, 'gi'), (m, sep, d) => {
-      const t = toHM(d);
-      return t ? sep + t : m;
-    })
+    .replace(
+      new RegExp(String.raw`((?:\b(?:${RANGE}|from)\b)\s*)(\d{3,4})\b`, 'gi'),
+      (m, sep, d) => {
+        const t = toHM(d);
+        return t ? sep + t : m;
+      },
+    )
     .replace(/\b(\d{3,4})(\s*[ap]\.?m\.?)/gi, (m, d, ap) => {
       const t = toHM(d);
       return t ? t + ap : m;
@@ -190,13 +204,24 @@ function normalizeCompactTimes(s) {
  */
 function normalizeSpokenTimes(s) {
   const HOURS = {
-    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
-    seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
   };
   let out = s
     .toLowerCase()
-    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g,
-      (m) => String(HOURS[m]));
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, (m) =>
+      String(HOURS[m]),
+    );
 
   // "2 thirty" / "2 fifteen" / "2 forty five" → "2:30" etc.
   out = out
@@ -255,7 +280,10 @@ function extractProject(description, projects) {
     const phrase = m[1].replace(/\bproject\b/gi, ' ').trim();
     const projectId = confidentMatch(phrase, projects);
     if (projectId) {
-      const rest = description.slice(0, m.index).replace(/[\s.,;:–-]+$/, '').trim();
+      const rest = description
+        .slice(0, m.index)
+        .replace(/[\s.,;:–-]+$/, '')
+        .trim();
       return { projectId, description: rest };
     }
   }
@@ -269,13 +297,21 @@ function extractProject(description, projects) {
  * only if it clears one distinctive hit, so "for the stuff" matches nothing.
  */
 function confidentMatch(phrase, projects) {
-  const words = new Set(phrase.toLowerCase().split(/\s+/).filter((w) => w.length >= 3));
+  const words = new Set(
+    phrase
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 3),
+  );
   if (!words.size) return null;
 
   let bestId = null;
   let bestScore = 0;
   for (const proj of projects) {
-    const projWords = proj.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+    const projWords = proj.name
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 3);
     let score = 0;
     for (const w of projWords) {
       if (words.has(w)) score += STOPWORDS.has(w) ? 0.5 : 2;
