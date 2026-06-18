@@ -55,6 +55,10 @@ export function parseEntry(transcript, now, projects) {
       // "between 8 and 8:45" → "8 to 8:45" so chrono reads it as one range. Only
       // fires between time-like tokens, so descriptions ("between teams") are safe.
       .replace(/\bbetween\s+(\d[\d:.\s]*?)\s+and\s+(\d[\d:.]*)/gi, '$1 to $2')
+      // Whisper sometimes splits the meridiem: "2 p m" / "p. m." → "2 pm".
+      // `m\b` anchors on the m itself so a trailing dot is consumed cleanly and
+      // words like "a memo" (m not its own token) are left alone.
+      .replace(/\b([ap])\.?\s+m\b\.?/gi, '$1m')
   );
 
   // First pass on the verbatim text keeps a clean description (no digit
