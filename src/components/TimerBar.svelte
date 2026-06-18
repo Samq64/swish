@@ -2,6 +2,8 @@
   import { store } from '../data/store.js';
   import { formatDuration, startOfDay } from '../lib/time.js';
   import Icon from '../lib/Icon.svelte';
+  import VoiceInput from './VoiceInput.svelte';
+  import { parseEntry } from '../lib/parse-entry.js';
 
   let description = $state('');
   let descInput;
@@ -39,6 +41,63 @@
     }
   });
 
+  // --- toast (auto-created entry confirmation) --------------------------------
+
+  let toast = $state(/** @type {{ entryId: string, text: string } | null} */ (null));
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let toastTimer;
+
+  function showToast(entryId, text) {
+    clearTimeout(toastTimer);
+    toast = { entryId, text };
+    toastTimer = setTimeout(() => (toast = null), 8000);
+  }
+
+  async function undoToast() {
+    clearTimeout(toastTimer);
+    if (toast) await store.remove(toast.entryId);
+    toast = null;
+  }
+
+  function fmtTime(iso) {
+    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
+      new Date(iso)
+    );
+  }
+
+  function fmtDay(iso) {
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(d);
+  }
+
+  // --- voice ------------------------------------------------------------------
+
+  // While the model downloads / transcribes, VoiceInput needs the bar's width
+  // for its status line; hide the other controls but keep VoiceInput mounted
+  // (unmounting it would kill the in-flight worker).
+  let voiceBusy = $state(false);
+
+  async function handleTranscript(text) {
+    const parsed = parseEntry(text, new Date(), store.projects);
+    if (parsed) {
+      const entry = await store.create({ ...parsed, tagIds: [] });
+      const desc = parsed.description || '(No description)';
+      const proj = parsed.projectId ? store.projectsById.get(parsed.projectId)?.name : null;
+      const parts = [desc, `${fmtTime(parsed.start)}–${fmtTime(parsed.end)}`, fmtDay(parsed.start)];
+      if (proj) parts.push(proj);
+      showToast(entry.id, parts.join(' · '));
+    } else {
+      description = description.trim() ? `${description.trim()} ${text}` : text;
+      if (running) store.update(running.id, { description });
+    }
+  }
+
   async function toggle() {
     if (running) {
       await store.stop(running.id);
@@ -63,22 +122,31 @@
   class="timer-bar"
   onsubmit={(e) => {
     e.preventDefault();
-    toggle();
+    if (!toast) toggle();
   }}
 >
-  <input
-    class="desc"
-    type="text"
-    placeholder="What are you working on?"
-    bind:this={descInput}
-    bind:value={description}
-    onchange={() => running && store.update(running.id, { description })}
-  />
-  <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
-  <button class="toggle" class:running type="submit" disabled={!canStart}>
-    <Icon name={running ? 'square' : 'play'} size={15} />
-    {running ? 'Stop' : 'Start'}
-  </button>
+  {#if toast}
+    <span class="toast-text">{toast.text}</span>
+    <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
+  {:else}
+    <input
+      class="desc"
+      type="text"
+      placeholder="What are you working on?"
+      bind:this={descInput}
+      bind:value={description}
+      hidden={voiceBusy}
+      onchange={() => running && store.update(running.id, { description })}
+    />
+    <VoiceInput ontranscript={handleTranscript} onbusy={(b) => (voiceBusy = b)} />
+    {#if !voiceBusy}
+      <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
+      <button class="toggle" class:running type="submit" disabled={!canStart}>
+        <Icon name={running ? 'square' : 'play'} size={15} />
+        {running ? 'Stop' : 'Start'}
+      </button>
+    {/if}
+  {/if}
 </form>
 
 <style>
@@ -138,5 +206,27 @@
   .toggle:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+  .toast-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .toast-undo {
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    padding: var(--space-1) var(--space-3);
+  }
+  .toast-undo:hover {
+    background: var(--bg);
   }
 </style>

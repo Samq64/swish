@@ -9,4 +9,9 @@ export default defineConfig({
     // lowers JS syntax newer than these; authored CSS is emitted as-is.
     target: ['chrome123', 'edge123', 'firefox120', 'safari17.5'],
   },
+  // Prevent Vite from pre-bundling transformers: it ships ESM with WASM
+  // that needs to stay as-is so the browser can resolve worker and WASM paths.
+  optimizeDeps: {
+    exclude: ['@huggingface/transformers'],
+  },
 });

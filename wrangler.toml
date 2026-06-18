@@ -12,3 +12,8 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 binding = "DB"
 database_name = "swish"
 database_id = "608822e2-3016-486b-9ec4-ab00829a939d"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "swish-preview"
+database_id = "06e1b796-5a55-42d9-9aac-7b7b45010dca"
