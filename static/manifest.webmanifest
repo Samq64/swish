@@ -1,11 +1,12 @@
 {
+  "id": "/",
   "name": "Time Tracker",
   "short_name": "Time Tracker",
   "description": "Track your time across projects, tags and workspaces.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#f7f7fa",
+  "background_color": "#6c5ce7",
   "theme_color": "#6c5ce7",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
