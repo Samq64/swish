@@ -85,11 +85,6 @@
 
   // --- voice ------------------------------------------------------------------
 
-  // While the model downloads / transcribes, VoiceInput needs the bar's width
-  // for its status line; hide the other controls but keep VoiceInput mounted
-  // (unmounting it would kill the in-flight worker).
-  let voiceBusy = $state(false);
-
   async function handleTranscript(text) {
     const parsed = parseEntry(text, new Date(), store.projects);
     if (parsed) {
@@ -138,24 +133,15 @@
     placeholder="What are you working on?"
     bind:this={descInput}
     bind:value={description}
-    hidden={voiceBusy}
     onchange={() => running && store.update(running.id, { description })}
   />
-  <VoiceInput
-    ontranscript={handleTranscript}
-    onbusy={(b) => {
-      voiceBusy = b;
-      // Clear a lingering confirmation as soon as the next clip is transcribing.
-      if (b) dismissToast();
-    }}
-  />
-  {#if !voiceBusy}
-    <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
-    <button class="toggle" class:running type="submit" disabled={!canStart}>
-      <Icon name={running ? 'square' : 'play'} size={15} />
-      {running ? 'Stop' : 'Start'}
-    </button>
-  {/if}
+  <!-- Clear a lingering confirmation as soon as the next clip starts transcribing. -->
+  <VoiceInput ontranscript={handleTranscript} onbusy={(b) => b && dismissToast()} />
+  <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
+  <button class="toggle" class:running type="submit" disabled={!canStart}>
+    <Icon name={running ? 'square' : 'play'} size={15} />
+    {running ? 'Stop' : 'Start'}
+  </button>
 
   <!-- Confirmation floats below the bar instead of replacing it, so the mic and
        input stay live during the undo window — a new dictation can start at once. -->
@@ -264,5 +250,18 @@
   }
   .toast-undo:hover {
     background: var(--bg);
+  }
+
+  /* On mobile the mic is a bottom-right FAB, so float the confirmation above it
+     (Undo near the thumb) rather than under the top bar where it can't be seen.
+     Offset clears the FAB: its bottom inset + height + a gap. */
+  @media (max-width: 640px) {
+    .toast {
+      position: fixed;
+      left: var(--space-4);
+      right: var(--space-4);
+      top: auto;
+      bottom: calc(var(--space-5) + 60px + var(--space-3));
+    }
   }
 </style>

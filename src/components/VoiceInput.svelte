@@ -221,28 +221,36 @@
 </script>
 
 {#if supported}
-  {#if phase === 'transcribing'}
-    <div class="voice-status" role="status" aria-live="polite">
-      <span class="spinner" aria-hidden="true"></span>
-      <span class="status-text">Transcribing…</span>
-    </div>
-  {:else}
-    <button
-      class="mic-btn"
-      class:recording={phase === 'recording'}
-      class:errored={phase === 'error'}
-      onclick={handleClick}
-      title={phase === 'recording'
-        ? 'Listening… stops when you finish (or tap)'
+  <!-- One morphing control across states (mic → stop → spinner). Inline in the
+       timer bar on desktop; promoted to a bottom-right FAB on narrow screens. -->
+  <button
+    class="mic-btn"
+    class:recording={phase === 'recording'}
+    class:busy={phase === 'transcribing'}
+    class:errored={phase === 'error'}
+    onclick={handleClick}
+    disabled={phase === 'transcribing'}
+    title={phase === 'recording'
+      ? 'Listening… stops when you finish (or tap)'
+      : phase === 'transcribing'
+        ? 'Transcribing…'
         : phase === 'error'
           ? 'Voice input failed — tap to retry'
           : 'Voice input — tap and speak'}
-      aria-label={phase === 'recording' ? 'Stop recording' : 'Start voice input'}
-      type="button"
-    >
+    aria-label={phase === 'recording'
+      ? 'Stop recording'
+      : phase === 'transcribing'
+        ? 'Transcribing'
+        : 'Start voice input'}
+    aria-live="polite"
+    type="button"
+  >
+    {#if phase === 'transcribing'}
+      <span class="spinner" aria-hidden="true"></span>
+    {:else}
       <Icon name="mic" size={15} />
-    </button>
-  {/if}
+    {/if}
+  </button>
 {/if}
 
 <style>
@@ -291,21 +299,47 @@
     flex-shrink: 0;
   }
 
-  .voice-status {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .status-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text);
+  /* Narrow screens (phone / driving): lift the mic out of the bar into a large
+     bottom-right FAB — a one-tap target in the thumb zone. Below the modal
+     backdrop (z-index 100) so dialogs still cover it. */
+  @media (max-width: 640px) {
+    .mic-btn {
+      position: fixed;
+      right: var(--space-5);
+      bottom: var(--space-5);
+      z-index: 40;
+      width: 60px;
+      height: 60px;
+      padding: 0;
+      justify-content: center;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
+    }
+    /* Touch, not hover — keep the pressed colours steady. */
+    .mic-btn:hover:not(:disabled) {
+      color: #fff;
+      background: var(--accent);
+    }
+    .mic-btn.recording {
+      color: #fff;
+      background: #e74c3c;
+    }
+    .mic-btn:disabled {
+      opacity: 1;
+    }
+    .mic-btn :global(.icon) {
+      --icon-size: 26px !important;
+    }
+    /* White spinner reads on the accent FAB; size it up to match. */
+    .mic-btn .spinner {
+      width: 24px;
+      height: 24px;
+      border-width: 3px;
+      border-color: rgb(255 255 255 / 0.4);
+      border-top-color: #fff;
+    }
   }
 
   @keyframes spin {
