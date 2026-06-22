@@ -5,8 +5,8 @@
  *
  * parseEntry turns a Whisper transcript into a time entry. These tests pin the
  * behaviour we rely on: range detection, the business-hours/day heuristics, the
- * explicit-cue project matching, and the messy-transcript normalisations
- * (colon-less times like "1215", split meridiems like "p m").
+ * explicit-cue project matching, and the natural-language normalisations
+ * ("between X and Y", "till"/"thru", spoken word-numbers).
  *
  * Dates are built with the local-time Date constructor and asserted via
  * getHours()/day-offset — the parser also works in local time, so the tests are
@@ -117,34 +117,6 @@ test('a description keeps hyphenated number words intact', () => {
   const r = parse('one-on-one with Sam from 3 to 3:30');
   assert.equal(r.description, 'One-on-one with Sam');
   assert.deepEqual(hm(r.start), [15, 0]);
-});
-
-// --- messy Whisper output -------------------------------------------------
-
-test('colon-less times ("1215") are parsed', () => {
-  const r = parse('add voice input to swish 1215 to 2pm');
-  assert.equal(r.description, 'Voice input to swish');
-  assert.deepEqual(hm(r.start), [12, 15]);
-  assert.deepEqual(hm(r.end), [14, 0]);
-});
-
-test('compact times only convert next to a range word, not ID-like numbers', () => {
-  const r = parse('ticket 1215 done from 2 to 3');
-  assert.match(r.description, /1215/); // left untouched
-  assert.deepEqual(hm(r.start), [14, 0]);
-  assert.deepEqual(hm(r.end), [15, 0]);
-});
-
-test('a split meridiem ("2 p m", "p. m.") is collapsed', () => {
-  assert.deepEqual(hm(parse('design review 2 to 4 p m').start), [14, 0]);
-  const dotted = parse('meeting 2 p. m. to 3 p. m.');
-  assert.deepEqual(hm(dotted.start), [14, 0]);
-  assert.deepEqual(hm(dotted.end), [15, 0]);
-});
-
-test('the meridiem fix leaves ordinary words ("a memo") alone', () => {
-  const r = parse('email a memo from 2 to 3');
-  assert.equal(r.description, 'Email a memo');
 });
 
 // --- explicit-cue project matching ---------------------------------------

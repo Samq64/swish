@@ -57,20 +57,14 @@ function hasDayReference(matchedText) {
  *   Returns null when no time range is found — treat as a plain description input.
  */
 export function parseEntry(transcript, now, projects) {
-  const raw = normalizeCompactTimes(
-    transcript
-      .trim()
-      // "between 8 and 8:45" → "8 to 8:45" so chrono reads it as one range. Only
-      // fires between time-like tokens, so descriptions ("between teams") are safe.
-      .replace(/\bbetween\s+(\d[\d:.\s]*?)\s+and\s+(\d[\d:.]*)/gi, '$1 to $2')
-      // Whisper sometimes splits the meridiem: "2 p m" / "p. m." → "2 pm".
-      // `m\b` anchors on the m itself so a trailing dot is consumed cleanly and
-      // words like "a memo" (m not its own token) are left alone.
-      .replace(/\b([ap])\.?\s+m\b\.?/gi, '$1m')
-      // Slang range connectors chrono doesn't know → ones it does.
-      .replace(/\bthru\b/gi, 'through')
-      .replace(/\btill?\b/gi, 'until'),
-  );
+  const raw = transcript
+    .trim()
+    // "between 8 and 8:45" → "8 to 8:45" so chrono reads it as one range. Only
+    // fires between time-like tokens, so descriptions ("between teams") are safe.
+    .replace(/\bbetween\s+(\d[\d:.\s]*?)\s+and\s+(\d[\d:.]*)/gi, '$1 to $2')
+    // Slang range connectors chrono doesn't know → ones it does.
+    .replace(/\bthru\b/gi, 'through')
+    .replace(/\btill?\b/gi, 'until');
 
   // First pass on the verbatim text keeps a clean description (no digit
   // mangling of words like "one-on-one"). Only if chrono finds no range do we
@@ -161,40 +155,6 @@ function shiftDays(d, n) {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
   return copy;
-}
-
-/**
- * Whisper often writes clock times without the colon ("1215" for 12:15, "915"
- * for 9:15). chrono can't read those, so a range like "1215 to 2pm" loses its
- * start and no entry is created. Insert the colon — but only for a 3–4 digit
- * run that sits next to a range word or am/pm, so ID-like numbers in a
- * description ("ticket 1215 done") are left alone.
- */
-function normalizeCompactTimes(s) {
-  const toHM = (digits) => {
-    const n = digits.length;
-    const h = +digits.slice(0, n - 2);
-    const m = +digits.slice(n - 2);
-    if (h > 23 || m > 59) return null;
-    return `${h}:${String(m).padStart(2, '0')}`;
-  };
-  const RANGE = String.raw`to|until|till|til|thru|through|and|-|–|—`;
-  return s
-    .replace(new RegExp(String.raw`\b(\d{3,4})(\s*(?:${RANGE})\b)`, 'gi'), (m, d, sep) => {
-      const t = toHM(d);
-      return t ? t + sep : m;
-    })
-    .replace(
-      new RegExp(String.raw`((?:\b(?:${RANGE}|from)\b)\s*)(\d{3,4})\b`, 'gi'),
-      (m, sep, d) => {
-        const t = toHM(d);
-        return t ? sep + t : m;
-      },
-    )
-    .replace(/\b(\d{3,4})(\s*[ap]\.?m\.?)/gi, (m, d, ap) => {
-      const t = toHM(d);
-      return t ? t + ap : m;
-    });
 }
 
 /**
