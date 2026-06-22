@@ -4,40 +4,13 @@
 
   let { ontranscript, onbusy } = $props();
 
-  // 'idle' | 'recording' | 'loading' (one-time model download) | 'transcribing' | 'error'
+  // 'idle' | 'recording' | 'transcribing' | 'error'
   let phase = $state('idle');
-  let loadedBytes = $state(0);
-  let totalBytes = $state(0);
 
-  // Let the parent reclaim the bar's width for a status line while we work.
+  // Let the parent reclaim the bar's width for a status line while we transcribe.
   $effect(() => {
-    onbusy?.(phase === 'loading' || phase === 'transcribing');
+    onbusy?.(phase === 'transcribing');
   });
-
-  // Cache Storage is evicted under pressure unless the origin is persisted;
-  // without this the ~75 MB model gets re-downloaded far too often.
-  let persistAsked = false;
-  async function ensurePersistentStorage() {
-    if (persistAsked || !navigator.storage?.persist) return;
-    persistAsked = true;
-    try {
-      await navigator.storage.persist();
-    } catch {
-      // best-effort; nothing to do if the browser refuses
-    }
-  }
-
-  // Worker is created lazily on first use and reused across recordings.
-  // The pipeline inside the worker is also cached after first load.
-  let worker = null;
-
-  function getWorker() {
-    if (worker) return worker;
-    worker = new Worker(new URL('../lib/whisper-worker.js', import.meta.url), {
-      type: 'module',
-    });
-    return worker;
-  }
 
   let mediaRecorder = null;
   let micStream = null;
@@ -53,7 +26,6 @@
   const MAX_MS = 12_000; // hard cap so road noise can't keep it open forever
 
   async function startRecording() {
-    ensurePersistentStorage();
     let stream;
     try {
       // Echo/noise/gain processing helps a lot in a car cabin.
@@ -134,54 +106,45 @@
 
   async function transcribeAudio() {
     micStream?.getTracks().forEach((t) => t.stop());
-    // Optimistic: a cached model skips straight to transcribing. The worker
-    // sends a 'loading' stage only if it actually has to download.
     phase = 'transcribing';
-    loadedBytes = 0;
-    totalBytes = 0;
 
-    let audioData;
+    let wav;
     try {
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
       audioChunks = []; // release the recorded buffers; we have the blob now
-      audioData = await decodeToFloat32(await blob.arrayBuffer());
+      const samples = await decodeToFloat32(await blob.arrayBuffer());
+      wav = encodeWav(samples, 16_000);
     } catch {
       showError('Audio decode failed');
       return;
     }
 
-    const w = getWorker();
-    const text = await new Promise((resolve, reject) => {
-      const handle = ({ data }) => {
-        if (data.type === 'stage') {
-          phase = data.stage; // 'loading' | 'transcribing'
-        } else if (data.type === 'progress') {
-          loadedBytes = data.loaded;
-          totalBytes = data.total;
-        } else if (data.type === 'result') {
-          w.removeEventListener('message', handle);
-          resolve(data.text);
-        } else if (data.type === 'error') {
-          w.removeEventListener('message', handle);
-          reject(new Error(data.message));
-        }
-      };
-      w.addEventListener('message', handle);
-      // Transfer the buffer so the worker owns it (zero-copy)
-      w.postMessage({ type: 'transcribe', audio: audioData }, [audioData.buffer]);
-    }).catch((err) => {
+    let text = null;
+    try {
+      // Transcription runs on Cloudflare Workers AI (Whisper); the body is the
+      // resampled WAV, so the same format reaches the model from every browser.
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'content-type': 'audio/wav' },
+        body: wav,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      text = (await res.json()).text;
+    } catch (err) {
       console.error('[VoiceInput]', err);
-      return null;
-    });
+    }
 
     if (text) {
       ontranscript(text);
       phase = 'idle';
     } else {
+      // Either the request failed or the clip was silent — both warrant a retry.
       showError('Transcription failed');
     }
   }
 
+  // `msg` is logged context only — the error state is shown via the mic button's
+  // styling and title, not as on-screen text.
   function showError(msg) {
     phase = 'error';
     setTimeout(() => {
@@ -205,9 +168,38 @@
     src.connect(offCtx.destination);
     src.start(0);
     const rendered = await offCtx.startRendering();
-    // Copy the samples out so the (large) AudioBuffer can be GC'd immediately and
-    // we transfer a standalone buffer to the worker rather than its backing store.
-    return new Float32Array(rendered.getChannelData(0));
+    return rendered.getChannelData(0);
+  }
+
+  // Encode Float32 samples as a 16-bit PCM mono WAV. WAV decodes reliably on the
+  // server across browsers, unlike the raw MediaRecorder output (webm/opus on
+  // Chrome, mp4/aac on Safari).
+  function encodeWav(samples, rate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    const writeStr = (off, s) => {
+      for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+    };
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // mono
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate * 2, true); // byte rate (rate * channels * bytesPerSample)
+    view.setUint16(32, 2, true); // block align
+    view.setUint16(34, 16, true); // bits per sample
+    writeStr(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    let off = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+    return buffer;
   }
 
   function handleClick() {
@@ -220,37 +212,19 @@
 
   const supported = browser && 'mediaDevices' in navigator && typeof MediaRecorder !== 'undefined';
 
-  let busy = $derived(phase === 'loading' || phase === 'transcribing');
-  const fmtMB = (bytes) => (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0);
-  let pct = $derived(totalBytes ? Math.min(100, Math.round((loadedBytes / totalBytes) * 100)) : 0);
-
-  // On unmount, release everything: mic, detector, decode context, and the
-  // worker (which holds the loaded model in memory).
+  // On unmount, release everything: mic, detector, and the decode context.
   $effect(() => () => {
     stopVad();
     micStream?.getTracks().forEach((t) => t.stop());
     decodeCtx?.close().catch(() => {});
-    worker?.terminate();
-    worker = null;
   });
 </script>
 
 {#if supported}
-  {#if busy}
+  {#if phase === 'transcribing'}
     <div class="voice-status" role="status" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
-      {#if phase === 'loading'}
-        <div class="status-body">
-          <span class="status-text">
-            Downloading voice model
-            {#if totalBytes}<span class="bytes">{fmtMB(loadedBytes)} / {fmtMB(totalBytes)} MB</span>{/if}
-            <span class="hint">· one-time</span>
-          </span>
-          <span class="bar" style:--pct="{pct}%"></span>
-        </div>
-      {:else}
-        <span class="status-text">Transcribing…</span>
-      {/if}
+      <span class="status-text">Transcribing…</span>
     </div>
   {:else}
     <button
@@ -327,45 +301,11 @@
     font-size: 13px;
   }
 
-  .status-body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
   .status-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text);
-  }
-
-  .bytes {
-    font-variant-numeric: tabular-nums;
-    color: var(--muted);
-  }
-
-  .hint {
-    color: var(--muted);
-  }
-
-  /* Thin determinate download bar under the label. */
-  .bar {
-    height: 3px;
-    border-radius: 999px;
-    background: var(--border);
-    overflow: hidden;
-  }
-  .bar::after {
-    content: '';
-    display: block;
-    height: 100%;
-    width: var(--pct, 0%);
-    background: var(--accent);
-    border-radius: inherit;
-    transition: width 0.2s ease;
   }
 
   @keyframes spin {

@@ -13,7 +13,15 @@ binding = "DB"
 database_name = "swish"
 database_id = "608822e2-3016-486b-9ec4-ab00829a939d"
 
+# Workers AI — powers voice transcription (Whisper) under /api/transcribe.
+# Free tier: 10,000 Neurons/day (resets 00:00 UTC), ample for short dictation.
+[ai]
+binding = "AI"
+
 [[env.preview.d1_databases]]
 binding = "DB"
 database_name = "swish-preview"
 database_id = "06e1b796-5a55-42d9-9aac-7b7b45010dca"
+
+[env.preview.ai]
+binding = "AI"

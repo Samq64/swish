@@ -60,6 +60,8 @@ async function route(event) {
       return handleShared(ctx, segs.slice(1), method, user);
     case 'settings':
       return handleSettings(ctx, segs.slice(1), method, user);
+    case 'transcribe':
+      return handleTranscribe(ctx, method);
     default:
       return error(404, 'Not found');
   }
@@ -797,6 +799,53 @@ async function handleSettings(ctx, rest, method, user) {
     return json({ ok: true });
   }
   return error(404, 'Not found');
+}
+
+// --- voice transcription -----------------------------------------------------
+
+// Whisper large-v3-turbo on Workers AI. Audio is sent as a 16 kHz mono WAV body
+// (the client resamples and encodes it) and forwarded base64-encoded.
+const WHISPER_MODEL = '@cf/openai/whisper-large-v3-turbo';
+// The client caps recordings at 12 s; a 16 kHz mono WAV of that is ~384 KB. This
+// ceiling leaves generous headroom while rejecting anything pathological before
+// it reaches the model.
+const AUDIO_MAX_BYTES = 2_000_000;
+
+/** Standard base64 (with padding) of a byte array, chunked to avoid blowing the
+ *  argument-count limit of String.fromCharCode on large buffers. */
+function bytesToBase64(bytes) {
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function handleTranscribe(ctx, method) {
+  const { env, request } = ctx;
+  if (method !== 'POST') return error(405, 'Method not allowed');
+  if (!env.AI) return error(503, 'Voice input is unavailable');
+
+  const buf = await request.arrayBuffer();
+  if (!buf || buf.byteLength === 0) return error(400, 'Empty audio');
+  if (buf.byteLength > AUDIO_MAX_BYTES) return error(413, 'Audio too large');
+
+  let res;
+  try {
+    res = await env.AI.run(WHISPER_MODEL, {
+      audio: bytesToBase64(new Uint8Array(buf)),
+      language: 'en',
+    });
+  } catch {
+    // Model error or the daily free-tier neuron budget is spent.
+    return error(502, 'Transcription failed');
+  }
+
+  // The model has shifted the text between a top-level field and
+  // `transcription_info` across versions; accept either.
+  const text = (res?.text ?? res?.transcription_info?.text ?? '').trim();
+  return json({ text });
 }
 
 // --- auth (account actions for the signed-in user) ---------------------------
