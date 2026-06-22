@@ -1,4 +1,5 @@
 <script>
+  import { fly } from 'svelte/transition';
   import { store } from '../data/store.js';
   import { formatDuration, startOfDay } from '../lib/time.js';
   import Icon from '../lib/Icon.svelte';
@@ -51,6 +52,12 @@
     clearTimeout(toastTimer);
     toast = { entryId, text };
     toastTimer = setTimeout(() => (toast = null), 8000);
+  }
+
+  /** Dismiss the confirmation without undoing — the entry stays created. */
+  function dismissToast() {
+    clearTimeout(toastTimer);
+    toast = null;
   }
 
   async function undoToast() {
@@ -122,35 +129,47 @@
   class="timer-bar"
   onsubmit={(e) => {
     e.preventDefault();
-    if (!toast) toggle();
+    toggle();
   }}
 >
+  <input
+    class="desc"
+    type="text"
+    placeholder="What are you working on?"
+    bind:this={descInput}
+    bind:value={description}
+    hidden={voiceBusy}
+    onchange={() => running && store.update(running.id, { description })}
+  />
+  <VoiceInput
+    ontranscript={handleTranscript}
+    onbusy={(b) => {
+      voiceBusy = b;
+      // Clear a lingering confirmation as soon as the next clip is transcribing.
+      if (b) dismissToast();
+    }}
+  />
+  {#if !voiceBusy}
+    <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
+    <button class="toggle" class:running type="submit" disabled={!canStart}>
+      <Icon name={running ? 'square' : 'play'} size={15} />
+      {running ? 'Stop' : 'Start'}
+    </button>
+  {/if}
+
+  <!-- Confirmation floats below the bar instead of replacing it, so the mic and
+       input stay live during the undo window — a new dictation can start at once. -->
   {#if toast}
-    <span class="toast-text">{toast.text}</span>
-    <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
-  {:else}
-    <input
-      class="desc"
-      type="text"
-      placeholder="What are you working on?"
-      bind:this={descInput}
-      bind:value={description}
-      hidden={voiceBusy}
-      onchange={() => running && store.update(running.id, { description })}
-    />
-    <VoiceInput ontranscript={handleTranscript} onbusy={(b) => (voiceBusy = b)} />
-    {#if !voiceBusy}
-      <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
-      <button class="toggle" class:running type="submit" disabled={!canStart}>
-        <Icon name={running ? 'square' : 'play'} size={15} />
-        {running ? 'Stop' : 'Start'}
-      </button>
-    {/if}
+    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: -4, duration: 150 }}>
+      <span class="toast-text">{toast.text}</span>
+      <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
+    </div>
   {/if}
 </form>
 
 <style>
   .timer-bar {
+    position: relative; /* anchor for the floating confirmation snackbar */
     flex: 1;
     min-width: 0;
     display: flex;
@@ -206,6 +225,23 @@
   .toggle:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+  /* Floats just below the bar, dropping over the content area rather than
+     consuming the bar's width. */
+  .toast {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   }
   .toast-text {
     flex: 1;
