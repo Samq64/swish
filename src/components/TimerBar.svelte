@@ -44,14 +44,23 @@
 
   // --- toast (auto-created entry confirmation) --------------------------------
 
-  let toast = $state(/** @type {{ entryId: string, text: string } | null} */ (null));
+  let toast = $state(
+    /** @type {{ kind: 'entry' | 'error', text: string, entryId?: string } | null} */ (null),
+  );
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let toastTimer;
 
   function showToast(entryId, text) {
     clearTimeout(toastTimer);
-    toast = { entryId, text };
+    toast = { kind: 'entry', entryId, text };
     toastTimer = setTimeout(() => (toast = null), 8000);
+  }
+
+  /** Surface a voice-input failure as a toast (no undo); auto-dismisses sooner. */
+  function showError(text) {
+    clearTimeout(toastTimer);
+    toast = { kind: 'error', text };
+    toastTimer = setTimeout(() => (toast = null), 5000);
   }
 
   /** Dismiss the confirmation without undoing — the entry stays created. */
@@ -135,11 +144,17 @@
     bind:value={description}
     onchange={() => running && store.update(running.id, { description })}
   />
-  <!-- Voice needs the Workers AI backend (/api/transcribe), which is auth-gated;
-       guest mode is local-only, so the mic is hidden rather than failing on 401.
-       Clear a lingering confirmation as soon as the next clip starts transcribing. -->
-  {#if !store.isGuest}
-    <VoiceInput ontranscript={handleTranscript} onbusy={(b) => b && dismissToast()} />
+  <!-- Voice needs the Workers AI backend (/api/transcribe), which is auth-gated,
+       so it's hidden for guests (local-only, would 401). Also hidden in the
+       reports view, which is for reviewing past time, not logging new entries.
+       onbusy clears a lingering confirmation as the next clip starts transcribing;
+       onerror surfaces failures as a toast. -->
+  {#if !store.isGuest && store.view !== 'reports'}
+    <VoiceInput
+      ontranscript={handleTranscript}
+      onbusy={(b) => b && dismissToast()}
+      onerror={showError}
+    />
   {/if}
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
   <button class="toggle" class:running type="submit" disabled={!canStart}>
@@ -150,9 +165,17 @@
   <!-- Confirmation floats below the bar instead of replacing it, so the mic and
        input stay live during the undo window — a new dictation can start at once. -->
   {#if toast}
-    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: -4, duration: 150 }}>
+    <div
+      class="toast"
+      class:error={toast.kind === 'error'}
+      role="status"
+      aria-live="polite"
+      transition:fly={{ y: -4, duration: 150 }}
+    >
       <span class="toast-text">{toast.text}</span>
-      <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
+      {#if toast.kind === 'entry'}
+        <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
+      {/if}
     </div>
   {/if}
 </form>
@@ -232,6 +255,13 @@
     border-radius: var(--radius);
     box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  }
+  /* Error variant: a red edge + text, no Undo. */
+  .toast.error {
+    border-color: var(--danger);
+  }
+  .toast.error .toast-text {
+    color: var(--danger);
   }
   .toast-text {
     flex: 1;

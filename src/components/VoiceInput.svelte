@@ -2,9 +2,9 @@
   import { browser } from '$app/environment';
   import Icon from '$lib/Icon.svelte';
 
-  let { ontranscript, onbusy } = $props();
+  let { ontranscript, onbusy, onerror } = $props();
 
-  // 'idle' | 'recording' | 'transcribing' | 'error'
+  // 'idle' | 'recording' | 'transcribing'
   let phase = $state('idle');
 
   // Let the parent reclaim the bar's width for a status line while we transcribe.
@@ -143,13 +143,11 @@
     }
   }
 
-  // `msg` is logged context only — the error state is shown via the mic button's
-  // styling and title, not as on-screen text.
+  // Surface the failure to the parent (shown as a toast) and return to idle so
+  // the mic is immediately ready to retry — no error state on the button itself.
   function showError(msg) {
-    phase = 'error';
-    setTimeout(() => {
-      phase = 'idle';
-    }, 3000);
+    phase = 'idle';
+    onerror?.(msg);
   }
 
   // One reusable decode context. Creating/closing an AudioContext per recording
@@ -205,7 +203,7 @@
   function handleClick() {
     if (phase === 'recording') {
       stopRecording(); // manual stop still works; VAD just makes it optional
-    } else if (phase === 'idle' || phase === 'error') {
+    } else if (phase === 'idle') {
       startRecording();
     }
   }
@@ -227,16 +225,13 @@
     class="mic-btn"
     class:recording={phase === 'recording'}
     class:busy={phase === 'transcribing'}
-    class:errored={phase === 'error'}
     onclick={handleClick}
     disabled={phase === 'transcribing'}
     title={phase === 'recording'
       ? 'Listening… stops when you finish (or tap)'
       : phase === 'transcribing'
         ? 'Transcribing…'
-        : phase === 'error'
-          ? 'Voice input failed — tap to retry'
-          : 'Voice input — tap and speak'}
+        : 'Voice input — tap and speak'}
     aria-label={phase === 'recording'
       ? 'Stop recording'
       : phase === 'transcribing'
@@ -277,10 +272,6 @@
   .mic-btn.recording {
     color: #e74c3c;
     animation: pulse 1.4s ease-in-out infinite;
-  }
-
-  .mic-btn.errored {
-    color: var(--danger);
   }
 
   .mic-btn:disabled {
