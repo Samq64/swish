@@ -84,15 +84,24 @@
         <button class="menu-item" onclick={() => run(onManageWorkspaces)}>
           <Icon name="folder" size={15} /> Manage workspaces
         </button>
-        <button class="menu-item" onclick={() => run(onOpenTeam)}>
-          <Icon name="users" size={15} /> Team
-        </button>
+        {#if !store.isGuest}
+          <!-- Teams require an account; a guest has no identity to share with. -->
+          <button class="menu-item" onclick={() => run(onOpenTeam)}>
+            <Icon name="users" size={15} /> Team
+          </button>
+        {/if}
         <button class="menu-item" onclick={() => run(onOpenSettings)}>
           <Icon name="settings" size={15} /> Settings
         </button>
-        <button class="menu-item" onclick={() => store.logout()}>
-          <Icon name="log-out" size={15} /> Log out {store.currentUser?.username ?? ''}
-        </button>
+        {#if store.isGuest}
+          <button class="menu-item" onclick={() => store.exitGuest()}>
+            <Icon name="log-out" size={15} /> Exit guest
+          </button>
+        {:else}
+          <button class="menu-item" onclick={() => store.logout()}>
+            <Icon name="log-out" size={15} /> Log out {store.currentUser?.username ?? ''}
+          </button>
+        {/if}
       </div>
     </div>
   {/if}

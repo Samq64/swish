@@ -257,6 +257,73 @@ test('a malformed timestamp is rejected', async () => {
   assert.equal(r.status, 400);
 });
 
+test('a workspace exports and re-imports with remapped ids', async () => {
+  // Build a small, self-contained workspace so the test doesn't depend on the
+  // mutations other tests made to the default one.
+  const src = await api('POST', '/api/workspaces', { cookie: alice, body: { name: 'Exportable' } });
+  const srcId = src.json.id;
+  const proj = await api('POST', '/api/projects', {
+    cookie: alice,
+    body: { workspaceId: srcId, name: 'Design', color: '#0984e3' },
+  });
+  const tag = await api('POST', '/api/tags', {
+    cookie: alice,
+    body: { workspaceId: srcId, name: 'billable' },
+  });
+  await api('POST', '/api/entries', {
+    cookie: alice,
+    body: {
+      workspaceId: srcId,
+      description: 'mockups',
+      projectId: proj.json.id,
+      tagIds: [tag.json.id],
+      start: TODAY,
+      end: TOMORROW,
+    },
+  });
+
+  const exported = await api('GET', `/api/workspaces/${srcId}/export`, { cookie: alice });
+  assert.equal(exported.status, 200);
+  assert.equal(exported.json.type, 'swish.workspace');
+  assert.equal(exported.json.version, 1);
+  assert.equal(exported.json.projects.length, 1);
+  assert.equal(exported.json.tags.length, 1);
+  assert.equal(exported.json.entries.length, 1);
+
+  const imported = await api('POST', '/api/workspaces/import', {
+    cookie: alice,
+    body: exported.json,
+  });
+  assert.equal(imported.status, 200);
+  const newId = imported.json.id;
+  assert.notEqual(newId, srcId, 'import creates a fresh workspace');
+
+  // The imported entry must point at the *re-mapped* project/tag, not the originals.
+  const projects = await api('GET', `/api/projects?workspaceId=${newId}`, { cookie: alice });
+  const tags = await api('GET', `/api/tags?workspaceId=${newId}`, { cookie: alice });
+  assert.notEqual(projects.json[0].id, proj.json.id, 'project id is remapped');
+  assert.equal(projects.json[0].color, '#0984e3');
+
+  const entries = await api(
+    'GET',
+    `/api/entries?workspaceId=${newId}&from=${TODAY}&to=${TOMORROW}`,
+    {
+      cookie: alice,
+    },
+  );
+  assert.equal(entries.json.length, 1);
+  assert.equal(entries.json[0].description, 'mockups');
+  assert.equal(entries.json[0].projectId, projects.json[0].id);
+  assert.deepEqual(entries.json[0].tagIds, [tags.json[0].id]);
+
+  // An unrecognised payload is rejected.
+  const bad = await api('POST', '/api/workspaces/import', {
+    cookie: alice,
+    body: { type: 'not-swish', projects: [] },
+  });
+  assert.equal(bad.status, 400);
+});
+
 test('a second user cannot read or write the first user’s data', async () => {
   const bob = await registerUser('bob', 'hunter2pw');
   const own = await api('GET', '/api/workspaces', { cookie: bob });

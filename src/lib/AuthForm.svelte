@@ -1,5 +1,6 @@
 <script>
   import { autofocus } from './actions.js';
+  import { setGuestCookie } from './guest.js';
 
   /**
    * The sign-in / sign-up card. Renders a plain POST form so it works without
@@ -9,6 +10,14 @@
   let { mode, form = null } = $props();
 
   let isLogin = $derived(mode === 'login');
+
+  // Guest mode is client-only (data lives in localStorage), so this needs JS —
+  // hence a button, not a link. Set the marker cookie the server guard checks,
+  // then a full navigation to the app shell.
+  function continueAsGuest() {
+    setGuestCookie();
+    window.location.assign('/');
+  }
   let title = $derived(isLogin ? 'Welcome back' : 'Create your account');
   let submit = $derived(isLogin ? 'Sign in' : 'Sign up');
   /** @type {'current-password' | 'new-password'} */
@@ -46,6 +55,12 @@
     <button type="submit">{submit}</button>
     <p class="switch">{switchText} <a href={switchHref}>{switchLabel}</a></p>
   </form>
+  {#if isLogin}
+    <div class="guest">
+      <span class="rule">or</span>
+      <button type="button" class="guest-btn" onclick={continueAsGuest}>Continue as guest</button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -54,6 +69,8 @@
        scrollable dead space below the card. */
     min-height: 100dvh;
     display: flex;
+    /* Column so the guest block stacks below the card rather than beside it. */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 20px;
@@ -68,7 +85,10 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 28px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+    /* Theme-aware shadow: a soft, cool drop on the light background; a deeper
+       one on dark, where a faint black shadow would be invisible. light-dark()
+       tracks the same color-scheme the rest of the palette does. */
+    box-shadow: 0 12px 40px light-dark(rgba(38, 38, 66, 0.1), rgba(0, 0, 0, 0.45));
   }
   .subtitle {
     margin: 0 0 var(--space-1);
@@ -109,5 +129,39 @@
     color: var(--accent);
     font-weight: 600;
     text-decoration: none;
+  }
+  .guest {
+    width: 100%;
+    max-width: 340px;
+    margin-top: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* "or" centred between two hairlines spanning the card width. */
+  .rule {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .rule::before,
+  .rule::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+  .guest-btn {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    font-size: 15px;
+    font-weight: 600;
   }
 </style>

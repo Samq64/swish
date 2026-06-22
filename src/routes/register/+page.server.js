@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { hashPassword } from '$lib/server/auth.js';
 import { createSession, setSessionCookie } from '$lib/server/session.js';
+import { DEFAULT_WORKSPACE_NAME } from '$lib/workspaceFormat.js';
 
 export function load({ locals }) {
   if (locals.user) throw redirect(303, '/');
@@ -34,7 +35,7 @@ export const actions = {
       env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(
         wsId,
         userId,
-        'Personal',
+        DEFAULT_WORKSPACE_NAME,
       ),
     ]);
 

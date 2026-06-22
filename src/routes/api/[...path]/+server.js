@@ -11,8 +11,8 @@ import { isIso, isStr, isStrArray, isHexColor } from '$lib/server/validate.js';
 import { hashPassword, verifyUserPassword, sha256b64url, COOKIE_NAME } from '$lib/server/auth.js';
 import { clearSessionCookie } from '$lib/server/session.js';
 import { listWorkspaces, listProjects, listTags, listSharedWorkspaces } from '$lib/server/data.js';
+import { DEFAULT_COLOR, isWorkspaceExport, buildExport, planImport } from '$lib/workspaceFormat.js';
 
-const DEFAULT_COLOR = '#6c5ce7';
 const NAME_MAX = 200;
 const DESC_MAX = 2000;
 // Cap on statements per D1 batch when importing (keeps a large import under the
@@ -459,7 +459,7 @@ async function handleWorkspaces(ctx, rest, method, user) {
 
   if (rest[0] === 'import' && method === 'POST') {
     const payload = (await readJson(request)) || {};
-    if (payload.type !== 'swish.workspace') return error(400, 'Unrecognized import file');
+    if (!isWorkspaceExport(payload)) return error(400, 'Unrecognized import file');
     return json(await importWorkspace(env, user.id, payload));
   }
 
@@ -518,71 +518,57 @@ async function exportWorkspace(env, id) {
   const tags = (
     await env.DB.prepare('SELECT id, name FROM tags WHERE workspace_id = ?').bind(id).all()
   ).results;
-  const entryRows = (
-    await env.DB.prepare(`${ENTRY_SELECT} WHERE e.workspace_id = ? ORDER BY e.start`).bind(id).all()
-  ).results;
-  const entries = entryRows.map(mapEntry).map((e) => ({
-    description: e.description,
-    projectId: e.projectId,
-    tagIds: e.tagIds,
-    start: e.start,
-    end: e.end,
-  }));
-  return { type: 'swish.workspace', version: 1, name: ws.name, projects, tags, entries };
+  const entries = (
+    await env.DB.prepare(`${ENTRY_SELECT} WHERE e.workspace_id = ?`).bind(id).all()
+  ).results.map(mapEntry);
+  // buildExport owns the envelope, field selection and ordering, shared with
+  // the guest-mode local repository.
+  return buildExport(ws.name, { projects, tags, entries });
 }
 
 async function importWorkspace(env, userId, payload) {
-  const wsId = crypto.randomUUID();
-  const name = (payload?.name || 'Imported workspace').toString();
+  // planImport owns id generation and reference re-mapping (shared with the
+  // local repo); here we just bind the plan into SQL inserts.
+  const { workspace, projects, tags, entries } = planImport(payload);
   const stmts = [
     env.DB.prepare('INSERT INTO workspaces (id, user_id, name) VALUES (?,?,?)').bind(
-      wsId,
+      workspace.id,
       userId,
-      name,
+      workspace.name,
     ),
   ];
 
-  const projectIdMap = new Map();
-  for (const p of payload?.projects ?? []) {
-    const np = crypto.randomUUID();
-    projectIdMap.set(p.id, np);
+  for (const p of projects) {
     stmts.push(
       env.DB.prepare('INSERT INTO projects (id, workspace_id, name, color) VALUES (?,?,?,?)').bind(
-        np,
-        wsId,
-        p.name ?? 'Project',
-        p.color ?? DEFAULT_COLOR,
+        p.id,
+        workspace.id,
+        p.name,
+        p.color,
       ),
     );
   }
 
-  const tagIdMap = new Map();
-  for (const t of payload?.tags ?? []) {
-    const nt = crypto.randomUUID();
-    tagIdMap.set(t.id, nt);
+  for (const t of tags) {
     stmts.push(
       env.DB.prepare('INSERT INTO tags (id, workspace_id, name) VALUES (?,?,?)').bind(
-        nt,
-        wsId,
-        t.name ?? 'tag',
+        t.id,
+        workspace.id,
+        t.name,
       ),
     );
   }
 
-  for (const e of payload?.entries ?? []) {
-    const ne = crypto.randomUUID();
-    const projectId = e.projectId != null ? (projectIdMap.get(e.projectId) ?? null) : null;
+  for (const e of entries) {
     stmts.push(
       env.DB.prepare(
         'INSERT INTO entries (id, workspace_id, description, project_id, start, ended_at) VALUES (?,?,?,?,?,?)',
-      ).bind(ne, wsId, e.description ?? '', projectId, e.start, e.end ?? null),
+      ).bind(e.id, workspace.id, e.description, e.projectId, e.start, e.end),
     );
-    for (const tid of e.tagIds ?? []) {
-      const nt = tagIdMap.get(tid);
-      if (nt)
-        stmts.push(
-          env.DB.prepare('INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)').bind(ne, nt),
-        );
+    for (const tid of e.tagIds) {
+      stmts.push(
+        env.DB.prepare('INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)').bind(e.id, tid),
+      );
     }
   }
 
@@ -592,7 +578,7 @@ async function importWorkspace(env, userId, payload) {
   for (let i = 0; i < stmts.length; i += IMPORT_BATCH_SIZE) {
     await env.DB.batch(stmts.slice(i, i + IMPORT_BATCH_SIZE));
   }
-  return { id: wsId, name };
+  return { id: workspace.id, name: workspace.name };
 }
 
 // --- teams & sharing ---------------------------------------------------------

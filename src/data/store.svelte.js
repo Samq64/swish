@@ -6,6 +6,7 @@ import {
   toDateInput,
   DAY_MS,
 } from '../lib/time.js';
+import { clearGuestCookie } from '../lib/guest.js';
 
 // Past this many days a day-bucketed report chart has too many bars to read, so
 // it switches to monthly buckets (matches the Year preset's granularity).
@@ -46,6 +47,12 @@ export class AppStore {
   currentUser = $state(null);
   /** False until the initial session check resolves (avoids a login flash). */
   ready = $state(false);
+  /**
+   * True when running as a guest: data is backed by a local (localStorage)
+   * repository instead of the cloud API. There's no account, so the UI hides
+   * teams, sharing and account settings, and "log out" becomes "exit guest".
+   */
+  isGuest = $state(false);
   /** Colour theme preference: 'auto' (follow OS) | 'light' | 'dark'. */
   theme = $state('auto');
   /** Day the week starts on: 0 = Sunday, 1 = Monday. */
@@ -76,6 +83,18 @@ export class AppStore {
 
   constructor(repository) {
     this.#repo = repository;
+  }
+
+  /**
+   * Swap the backing repository. Used to enter guest mode with a local
+   * (localStorage) repository before hydrating; the store itself stays agnostic
+   * about which implementation it talks to.
+   * @param {ReturnType<typeof import('./localRepository.js').createLocalRepository>} repository
+   * @param {{ guest?: boolean }} [opts]
+   */
+  useRepository(repository, { guest = false } = {}) {
+    this.#repo = repository;
+    this.isGuest = guest;
   }
 
   /** ISO start-of-day strings for every column currently visible. */
@@ -269,6 +288,16 @@ export class AppStore {
     form.action = '/logout';
     document.body.append(form);
     form.submit();
+  }
+
+  /**
+   * Leave guest mode and return to the login screen. The local data is left in
+   * place (so the guest can resume later); only the marker cookie is cleared,
+   * which makes the server guard route the next request to /login.
+   */
+  exitGuest() {
+    clearGuestCookie();
+    window.location.assign('/login');
   }
 
   /** Sign out every other session, keeping this one active. */

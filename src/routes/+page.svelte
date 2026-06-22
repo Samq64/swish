@@ -2,6 +2,7 @@
   import { fade } from 'svelte/transition';
   import { untrack } from 'svelte';
   import { store } from '../data/store.js';
+  import { createLocalRepository, readGuestBootstrap } from '../data/localRepository.js';
   import { formatDuration } from '../lib/time.js';
   import { entryDurationMin } from '../lib/entries.js';
   import { clickOutside } from '../lib/actions.js';
@@ -16,6 +17,7 @@
   import SettingsModal from '../components/SettingsModal.svelte';
   import WorkspacesModal from '../components/WorkspacesModal.svelte';
   import TeamModal from '../components/TeamModal.svelte';
+  import GuestBanner from '../components/GuestBanner.svelte';
 
   // Report range presets shown in the header for the reports view (kept lean —
   // arbitrary windows are covered by Custom). State lives on the store so the
@@ -46,17 +48,34 @@
   });
 
   let { data } = $props();
-  // One-time seed from the server load; intentionally reads the initial `data`
-  // only (untrack), and stays synchronous so the page server-renders with
-  // content rather than the not-ready placeholder.
-  untrack(() => store.hydrate(data));
+  // One-time seed. For a real account the bootstrap comes from the server load;
+  // for a guest there's no server data, so we point the store at a local
+  // (localStorage) repository and build the bootstrap from there. Either way
+  // it's synchronous (localStorage is too), so the page renders with content
+  // rather than the not-ready placeholder. Reads the initial values only
+  // (untrack).
+  untrack(() => {
+    if ('guest' in data) {
+      store.useRepository(createLocalRepository(), { guest: true });
+      store.hydrate(readGuestBootstrap());
+    } else {
+      store.hydrate(data);
+    }
+  });
 
   // Reflect the user's theme onto <html>; 'auto' drops the attribute so app.css
-  // falls back to the OS preference.
+  // falls back to the OS preference. Mirror it to localStorage so the pre-paint
+  // bootstrap in app.html can apply the same palette on the next load and on the
+  // server-rendered auth screens — keeping the theme consistent across reloads.
   $effect(() => {
     const el = document.documentElement;
     if (store.theme === 'auto') el.removeAttribute('data-theme');
     else el.setAttribute('data-theme', store.theme);
+    try {
+      localStorage.setItem('swish.theme', store.theme);
+    } catch {
+      /* storage blocked: theme just won't persist across reloads */
+    }
   });
 
   let showProjects = $state(false);
@@ -142,6 +161,9 @@
 {#if !store.ready}
   <!-- Loading the signed-in user's data; hooks.server.js already gated access. -->
 {:else}
+  {#if store.isGuest}
+    <GuestBanner />
+  {/if}
   <header class="topbar">
     <WorkspaceSelector
       onOpenSettings={() => (showSettings = true)}
