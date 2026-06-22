@@ -113,6 +113,23 @@ test('spoken word-numbers are parsed via the fallback pass', () => {
   assert.deepEqual(hm(r.end), [15, 0]);
 });
 
+test('a dashed range ("2-4") is read as a range', () => {
+  const bare = parse('design review 2-4');
+  assert.deepEqual(hm(bare.start), [14, 0]); // business-hours bias
+  assert.deepEqual(hm(bare.end), [16, 0]);
+
+  const withMeridiem = parse('standup 10-11:30 am');
+  assert.deepEqual(hm(withMeridiem.start), [10, 0]);
+  assert.deepEqual(hm(withMeridiem.end), [11, 30]);
+});
+
+test('the dash-range fix leaves hyphenated words and dates alone', () => {
+  // No digits on both sides of the hyphen → untouched, so no range, null result.
+  assert.equal(parse('one-on-one catch-up'), null);
+  // A date chain must not be split into a spurious range.
+  assert.equal(parse('migrate the 2026-06-18 export'), null);
+});
+
 test('a description keeps hyphenated number words intact', () => {
   const r = parse('one-on-one with Sam from 3 to 3:30');
   assert.equal(r.description, 'One-on-one with Sam');

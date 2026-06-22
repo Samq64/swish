@@ -62,6 +62,12 @@ export function parseEntry(transcript, now, projects) {
     // "between 8 and 8:45" → "8 to 8:45" so chrono reads it as one range. Only
     // fires between time-like tokens, so descriptions ("between teams") are safe.
     .replace(/\bbetween\s+(\d[\d:.\s]*?)\s+and\s+(\d[\d:.]*)/gi, '$1 to $2')
+    // Whisper renders a spoken range with a dash: "2-4", "2-4pm", "10-11:30".
+    // chrono won't read a bare numeric dash as a range, so rewrite it to "to".
+    // Limited to clock-like tokens (1–2 digit hour, optional :mm) joined by a
+    // tight dash; the (?<!-)/(?!-) guards skip date chains ("2026-06-18") and
+    // the digit requirement leaves hyphenated words ("one-on-one") alone.
+    .replace(/\b(?<!-)(\d{1,2}(?::\d{2})?)[-–—](\d{1,2}(?::\d{2})?)(?!-)\b/g, '$1 to $2')
     // Slang range connectors chrono doesn't know → ones it does.
     .replace(/\bthru\b/gi, 'through')
     .replace(/\btill?\b/gi, 'until');
