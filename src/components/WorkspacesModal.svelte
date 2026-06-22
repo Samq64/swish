@@ -1,5 +1,6 @@
 <script>
   import { store } from '../data/store.js';
+  import { isWorkspaceExport } from '../lib/workspaceFormat.js';
   import Modal from '../lib/Modal.svelte';
   import Icon from '../lib/Icon.svelte';
 
@@ -53,8 +54,8 @@
     if (!file) return;
     try {
       const payload = JSON.parse(await file.text());
-      if (payload?.type !== 'swish.workspace') {
-        throw new Error('Not a swish workspace export');
+      if (!isWorkspaceExport(payload)) {
+        throw new Error('Not a valid workspace export');
       }
       await store.importWorkspace(payload);
     } catch {

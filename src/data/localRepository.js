@@ -19,8 +19,14 @@
  *   - deleting a workspace drops its projects, tags and entries.
  */
 
+import {
+  DEFAULT_COLOR,
+  DEFAULT_WORKSPACE_NAME,
+  buildExport,
+  planImport,
+} from '../lib/workspaceFormat.js';
+
 export const STORAGE_KEY = 'swish.guest.v1';
-const DEFAULT_COLOR = '#6c5ce7';
 
 const uuid = () => crypto.randomUUID();
 const byStart = (a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
@@ -45,7 +51,7 @@ function emptyState() {
 // match the one registration auto-creates for a real account.
 function seedState() {
   const state = emptyState();
-  const ws = { id: uuid(), name: 'Personal' };
+  const ws = { id: uuid(), name: DEFAULT_WORKSPACE_NAME };
   state.workspaces.push(ws);
   state.activeWorkspaceId = ws.id;
   return state;
@@ -280,77 +286,32 @@ export function createLocalRepository(storage = globalThis.localStorage) {
     },
 
     // --- export / import (the bridge to/from a real account) ---
+    // buildExport and planImport are shared with the cloud backend, so the file
+    // format and id-remapping are identical on both sides.
     exportWorkspace: (workspaceId) => {
       const state = read();
       const ws = state.workspaces.find((w) => w.id === workspaceId);
       if (!ws) return Promise.reject(new Error('Not found'));
-      const projects = state.projects
-        .filter((p) => p.workspaceId === workspaceId)
-        .map((p) => ({ id: p.id, name: p.name, color: p.color }));
-      const tags = state.tags
-        .filter((t) => t.workspaceId === workspaceId)
-        .map((t) => ({ id: t.id, name: t.name }));
-      const entries = state.entries
-        .filter((e) => e.workspaceId === workspaceId)
-        .sort(byStart)
-        .map((e) => ({
-          description: e.description,
-          projectId: e.projectId,
-          tagIds: e.tagIds,
-          start: e.start,
-          end: e.end,
-        }));
-      return resolve({
-        type: 'swish.workspace',
-        version: 1,
-        name: ws.name,
-        projects,
-        tags,
-        entries,
-      });
+      const inWorkspace = (rows) => rows.filter((r) => r.workspaceId === workspaceId);
+      return resolve(
+        buildExport(ws.name, {
+          projects: inWorkspace(state.projects),
+          tags: inWorkspace(state.tags),
+          entries: inWorkspace(state.entries),
+        }),
+      );
     },
 
     importWorkspace: (payload) => {
       const state = read();
-      const ws = { id: uuid(), name: (payload?.name || 'Imported workspace').toString() };
-      state.workspaces.push(ws);
-
-      // Remap ids so an import never collides with existing rows (mirrors the server).
-      const projectIdMap = new Map();
-      for (const p of payload?.projects ?? []) {
-        const np = uuid();
-        projectIdMap.set(p.id, np);
-        state.projects.push({
-          id: np,
-          workspaceId: ws.id,
-          name: p.name ?? 'Project',
-          color: p.color ?? DEFAULT_COLOR,
-        });
-      }
-
-      const tagIdMap = new Map();
-      for (const t of payload?.tags ?? []) {
-        const nt = uuid();
-        tagIdMap.set(t.id, nt);
-        state.tags.push({ id: nt, workspaceId: ws.id, name: t.name ?? 'tag' });
-      }
-
-      for (const e of payload?.entries ?? []) {
-        const projectId = e.projectId != null ? (projectIdMap.get(e.projectId) ?? null) : null;
-        const tagIds = (e.tagIds ?? []).map((tid) => tagIdMap.get(tid)).filter(Boolean);
-        state.entries.push({
-          id: uuid(),
-          workspaceId: ws.id,
-          description: e.description ?? '',
-          projectId,
-          tagIds,
-          start: e.start,
-          end: e.end ?? null,
-        });
-      }
-
+      const { workspace, projects, tags, entries } = planImport(payload);
+      // The plan carries fresh ids and remapped refs; attach the new workspaceId.
+      state.workspaces.push(workspace);
+      for (const p of projects) state.projects.push({ ...p, workspaceId: workspace.id });
+      for (const t of tags) state.tags.push({ ...t, workspaceId: workspace.id });
+      for (const e of entries) state.entries.push({ ...e, workspaceId: workspace.id });
       write(state);
-      return resolve(toWorkspace(ws));
+      return resolve(toWorkspace(workspace));
     },
   };
 }
