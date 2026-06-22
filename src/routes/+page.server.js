@@ -16,8 +16,14 @@ import {
 export const ssr = false;
 
 export async function load({ locals, platform }) {
-  // hooks.server.js has already gated this route, so locals.user is present,
-  // and the Cloudflare adapter always provides `platform`.
+  // A guest reaches here without a session (the hook lets them through on the
+  // guest cookie). There's no server-side data for a guest — their workspaces
+  // live in localStorage — so we ship a marker and the client hydrates the
+  // store from the local repository instead. See routes/+page.svelte.
+  if (!locals.user) return { guest: true };
+
+  // Otherwise hooks.server.js guaranteed a session, and the Cloudflare adapter
+  // always provides `platform`.
   const user = /** @type {NonNullable<App.Locals['user']>} */ (locals.user);
   const env = /** @type {App.Platform} */ (platform).env;
 

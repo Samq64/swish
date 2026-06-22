@@ -1,5 +1,6 @@
 <script>
   import { store } from '../data/store.js';
+  import { clearGuestData } from '../data/localRepository.js';
   import Modal from '../lib/Modal.svelte';
   import Icon from '../lib/Icon.svelte';
 
@@ -48,6 +49,14 @@
     } finally {
       sessionsBusy = false;
     }
+  }
+
+  // Guest-only: wipe localStorage and reload so the store re-hydrates from a
+  // fresh, empty workspace. Stays in guest mode (the marker cookie is untouched).
+  function clearData() {
+    if (!confirm('Delete all guest data in this browser? This cannot be undone.')) return;
+    clearGuestData();
+    window.location.reload();
   }
 
   async function deleteAccount() {
@@ -122,61 +131,77 @@
       </div>
     </section>
 
-    <section class="section">
-      <h3>Account</h3>
-      <p class="account-line">
-        Signed in as <strong>{store.currentUser?.username}</strong>
-      </p>
-      <form onsubmit={(e) => (e.preventDefault(), submitPassword())}>
-        <input
-          type="password"
-          placeholder="Current password"
-          autocomplete="current-password"
-          bind:value={currentPassword}
-          required
-        />
-        <input
-          type="password"
-          placeholder="New password (min 8 characters)"
-          autocomplete="new-password"
-          bind:value={newPassword}
-          required
-        />
-        {#if pwError}<p class="msg error">{pwError}</p>{/if}
-        {#if pwOk}<p class="msg ok">Password updated. Other sessions were signed out.</p>{/if}
-        <button class="btn" type="submit" disabled={pwBusy}>
-          {pwBusy ? 'Updating…' : 'Update password'}
+    {#if store.isGuest}
+      <!-- A guest has no account, sessions or server-side data to manage — only
+           the locally-stored data, which can be wiped here. -->
+      <section class="section danger">
+        <h3>Clear data</h3>
+        <p class="hint">
+          Permanently deletes all guest workspaces, projects, tags and entries from this browser.
+          This cannot be undone — export first if you want to keep anything.
+        </p>
+        <button class="btn delete" type="button" onclick={clearData}>
+          <Icon name="trash-2" size={15} />
+          Clear guest data
         </button>
-      </form>
-    </section>
+      </section>
+    {:else}
+      <section class="section">
+        <h3>Account</h3>
+        <p class="account-line">
+          Signed in as <strong>{store.currentUser?.username}</strong>
+        </p>
+        <form onsubmit={(e) => (e.preventDefault(), submitPassword())}>
+          <input
+            type="password"
+            placeholder="Current password"
+            autocomplete="current-password"
+            bind:value={currentPassword}
+            required
+          />
+          <input
+            type="password"
+            placeholder="New password (min 8 characters)"
+            autocomplete="new-password"
+            bind:value={newPassword}
+            required
+          />
+          {#if pwError}<p class="msg error">{pwError}</p>{/if}
+          {#if pwOk}<p class="msg ok">Password updated. Other sessions were signed out.</p>{/if}
+          <button class="btn" type="submit" disabled={pwBusy}>
+            {pwBusy ? 'Updating…' : 'Update password'}
+          </button>
+        </form>
+      </section>
 
-    <section class="section">
-      <h3>Sessions</h3>
-      <p class="hint">Sign out everywhere except this device.</p>
-      {#if sessionsOk}<p class="msg ok">Other sessions signed out.</p>{/if}
-      <button class="btn" type="button" disabled={sessionsBusy} onclick={logoutOthers}>
-        {sessionsBusy ? 'Signing out…' : 'Log out other sessions'}
-      </button>
-    </section>
+      <section class="section">
+        <h3>Sessions</h3>
+        <p class="hint">Sign out everywhere except this device.</p>
+        {#if sessionsOk}<p class="msg ok">Other sessions signed out.</p>{/if}
+        <button class="btn" type="button" disabled={sessionsBusy} onclick={logoutOthers}>
+          {sessionsBusy ? 'Signing out…' : 'Log out other sessions'}
+        </button>
+      </section>
 
-    <section class="section danger">
-      <h3>Delete account</h3>
-      <p class="hint">
-        Permanently deletes your account and all workspaces, projects, tags and entries. This cannot
-        be undone.
-      </p>
-      <input
-        type="password"
-        placeholder="Confirm password"
-        autocomplete="current-password"
-        bind:value={deletePassword}
-      />
-      {#if deleteError}<p class="msg error">{deleteError}</p>{/if}
-      <button class="btn delete" type="button" disabled={deleteBusy} onclick={deleteAccount}>
-        <Icon name="trash-2" size={15} />
-        {deleteBusy ? 'Deleting…' : 'Delete account'}
-      </button>
-    </section>
+      <section class="section danger">
+        <h3>Delete account</h3>
+        <p class="hint">
+          Permanently deletes your account and all workspaces, projects, tags and entries. This
+          cannot be undone.
+        </p>
+        <input
+          type="password"
+          placeholder="Confirm password"
+          autocomplete="current-password"
+          bind:value={deletePassword}
+        />
+        {#if deleteError}<p class="msg error">{deleteError}</p>{/if}
+        <button class="btn delete" type="button" disabled={deleteBusy} onclick={deleteAccount}>
+          <Icon name="trash-2" size={15} />
+          {deleteBusy ? 'Deleting…' : 'Delete account'}
+        </button>
+      </section>
+    {/if}
   </div>
 </Modal>
 

@@ -28,6 +28,18 @@
         }
       }
     </style>
+    <script>
+      // Apply the saved colour theme before first paint, so every page — the
+      // client-rendered app and the server-rendered auth screens alike — shows a
+      // consistent palette with no flash. 'auto'/unset leaves color-scheme
+      // following the OS. The store keeps this key in sync (see routes/+page.svelte).
+      try {
+        var t = localStorage.getItem('swish.theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {
+        /* storage blocked: fall back to the OS preference */
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body>
