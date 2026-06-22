@@ -135,8 +135,12 @@
     bind:value={description}
     onchange={() => running && store.update(running.id, { description })}
   />
-  <!-- Clear a lingering confirmation as soon as the next clip starts transcribing. -->
-  <VoiceInput ontranscript={handleTranscript} onbusy={(b) => b && dismissToast()} />
+  <!-- Voice needs the Workers AI backend (/api/transcribe), which is auth-gated;
+       guest mode is local-only, so the mic is hidden rather than failing on 401.
+       Clear a lingering confirmation as soon as the next clip starts transcribing. -->
+  {#if !store.isGuest}
+    <VoiceInput ontranscript={handleTranscript} onbusy={(b) => b && dismissToast()} />
+  {/if}
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
   <button class="toggle" class:running type="submit" disabled={!canStart}>
     <Icon name={running ? 'square' : 'play'} size={15} />
