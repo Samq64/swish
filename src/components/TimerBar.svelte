@@ -1,7 +1,10 @@
 <script>
+  import { fly } from 'svelte/transition';
   import { store } from '../data/store.js';
   import { formatDuration, startOfDay } from '../lib/time.js';
   import Icon from '../lib/Icon.svelte';
+  import VoiceInput from './VoiceInput.svelte';
+  import { parseEntry } from '../lib/parse-entry.js';
 
   let description = $state('');
   let descInput;
@@ -39,6 +42,64 @@
     }
   });
 
+  // --- toast (auto-created entry confirmation) --------------------------------
+
+  let toast = $state(/** @type {{ entryId: string, text: string } | null} */ (null));
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let toastTimer;
+
+  function showToast(entryId, text) {
+    clearTimeout(toastTimer);
+    toast = { entryId, text };
+    toastTimer = setTimeout(() => (toast = null), 8000);
+  }
+
+  /** Dismiss the confirmation without undoing — the entry stays created. */
+  function dismissToast() {
+    clearTimeout(toastTimer);
+    toast = null;
+  }
+
+  async function undoToast() {
+    clearTimeout(toastTimer);
+    if (toast) await store.remove(toast.entryId);
+    toast = null;
+  }
+
+  function fmtTime(iso) {
+    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
+      new Date(iso)
+    );
+  }
+
+  function fmtDay(iso) {
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(d);
+  }
+
+  // --- voice ------------------------------------------------------------------
+
+  async function handleTranscript(text) {
+    const parsed = parseEntry(text, new Date(), store.projects);
+    if (parsed) {
+      const entry = await store.create({ ...parsed, tagIds: [] });
+      const desc = parsed.description || '(No description)';
+      const proj = parsed.projectId ? store.projectsById.get(parsed.projectId)?.name : null;
+      const parts = [desc, `${fmtTime(parsed.start)}–${fmtTime(parsed.end)}`, fmtDay(parsed.start)];
+      if (proj) parts.push(proj);
+      showToast(entry.id, parts.join(' · '));
+    } else {
+      description = description.trim() ? `${description.trim()} ${text}` : text;
+      if (running) store.update(running.id, { description });
+    }
+  }
+
   async function toggle() {
     if (running) {
       await store.stop(running.id);
@@ -74,15 +135,31 @@
     bind:value={description}
     onchange={() => running && store.update(running.id, { description })}
   />
+  <!-- Voice needs the Workers AI backend (/api/transcribe), which is auth-gated;
+       guest mode is local-only, so the mic is hidden rather than failing on 401.
+       Clear a lingering confirmation as soon as the next clip starts transcribing. -->
+  {#if !store.isGuest}
+    <VoiceInput ontranscript={handleTranscript} onbusy={(b) => b && dismissToast()} />
+  {/if}
   <span class="clock" class:active={!!running}>{formatDuration(elapsedMin)}</span>
   <button class="toggle" class:running type="submit" disabled={!canStart}>
     <Icon name={running ? 'square' : 'play'} size={15} />
     {running ? 'Stop' : 'Start'}
   </button>
+
+  <!-- Confirmation floats below the bar instead of replacing it, so the mic and
+       input stay live during the undo window — a new dictation can start at once. -->
+  {#if toast}
+    <div class="toast" role="status" aria-live="polite" transition:fly={{ y: -4, duration: 150 }}>
+      <span class="toast-text">{toast.text}</span>
+      <button class="toast-undo" type="button" onclick={undoToast}>Undo</button>
+    </div>
+  {/if}
 </form>
 
 <style>
   .timer-bar {
+    position: relative; /* anchor for the floating confirmation snackbar */
     flex: 1;
     min-width: 0;
     display: flex;
@@ -138,5 +215,57 @@
   .toggle:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+  /* Floats just below the bar, dropping over the content area rather than
+     consuming the bar's width. */
+  .toast {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  }
+  .toast-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .toast-undo {
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    padding: var(--space-1) var(--space-3);
+  }
+  .toast-undo:hover {
+    background: var(--bg);
+  }
+
+  /* On mobile the mic is a bottom-right FAB, so float the confirmation above it
+     (Undo near the thumb) rather than under the top bar where it can't be seen.
+     Offset clears the FAB: its bottom inset + height + a gap. */
+  @media (max-width: 640px) {
+    .toast {
+      position: fixed;
+      left: var(--space-4);
+      right: var(--space-4);
+      top: auto;
+      bottom: calc(var(--space-5) + 60px + var(--space-3));
+    }
   }
 </style>

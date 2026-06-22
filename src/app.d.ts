@@ -15,6 +15,7 @@ declare global {
     interface Platform {
       env: {
         DB: import('@cloudflare/workers-types').D1Database;
+        AI: import('@cloudflare/workers-types').Ai;
         PEPPER?: string;
       };
     }
