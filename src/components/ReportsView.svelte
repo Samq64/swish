@@ -24,6 +24,14 @@
   /** The window to report on (`{ from, to, unit }`), owned by the store. */
   let range = $derived(store.reportRange);
 
+  /**
+   * Index of the chart bar (day/month) the pointer is over, or null. While set,
+   * the stats, breakdown and table scope down to just that bucket so you can
+   * inspect a single day without changing the range; the bar chart itself stays
+   * showing the whole range. Cleared on mouse-leave.
+   */
+  let hoveredIdx = $state(/** @type {number | null} */ (null));
+
   // Refetch whenever the range or the active workspace changes. A token guards
   // against an out-of-order response overwriting a newer one.
   let reqToken = 0;
@@ -45,6 +53,34 @@
 
   /** Completed entries only — running/open entries have no duration yet. */
   let completed = $derived(entries.filter((e) => e.end));
+
+  /** One bar per day (or month, for the year view), in chronological order. */
+  let buckets = $derived.by(() => {
+    const { from, to, unit } = range;
+    /** @type {{ start: Date, min: number, entries: import('../data/repository.js').TimeEntry[] }[]} */
+    const list = [];
+    if (unit === 'month') {
+      for (let d = new Date(from); d < to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+        list.push({ start: new Date(d), min: 0, entries: [] });
+      }
+    } else {
+      for (let d = new Date(from); d < to; d = addDays(d, 1)) {
+        list.push({ start: new Date(d), min: 0, entries: [] });
+      }
+    }
+    for (const e of completed) {
+      const t = new Date(e.start);
+      const idx =
+        unit === 'month'
+          ? (t.getFullYear() - from.getFullYear()) * 12 + (t.getMonth() - from.getMonth())
+          : Math.floor((startOfDay(t).getTime() - startOfDay(from).getTime()) / DAY_MS);
+      if (idx >= 0 && idx < list.length) {
+        list[idx].min += entryDurationMin(e);
+        list[idx].entries.push(e);
+      }
+    }
+    return list;
+  });
 
   let totalMin = $derived(completed.reduce((s, e) => s + entryDurationMin(e), 0));
 
@@ -76,6 +112,30 @@
   });
 
   /**
+   * Per-project rows for the summary table: total duration plus every entry's
+   * note (`description`) for that project, joined with "; ". Notes are gathered
+   * in chronological order and de-duplicated so a repeated note isn't listed
+   * twice; blank descriptions are skipped. Shares `byProject`'s ordering.
+   */
+  let projectRows = $derived.by(() => {
+    const notes = new Map();
+    const byStart = [...completed].sort(
+      (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+    );
+    for (const e of byStart) {
+      const key = e.projectId ?? NO_PROJECT;
+      const note = e.description?.trim();
+      if (!note) continue;
+      if (!notes.has(key)) notes.set(key, new Set());
+      notes.get(key).add(note);
+    }
+    return byProject.map((p) => ({
+      ...p,
+      notes: [...(notes.get(p.key) ?? [])].join('; '),
+    }));
+  });
+
+  /**
    * Donut segments. Built on a circle whose circumference is exactly 100, so a
    * segment's percentage doubles as its dash length; `offset` rotates each one
    * to begin where the previous ended (25 puts the first at 12 o'clock).
@@ -89,30 +149,6 @@
         acc += p.pct;
         return seg;
       });
-  });
-
-  /** One bar per day (or month, for the year view), in chronological order. */
-  let buckets = $derived.by(() => {
-    const { from, to, unit } = range;
-    const list = [];
-    if (unit === 'month') {
-      for (let d = new Date(from); d < to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-        list.push({ start: new Date(d), min: 0 });
-      }
-    } else {
-      for (let d = new Date(from); d < to; d = addDays(d, 1)) {
-        list.push({ start: new Date(d), min: 0 });
-      }
-    }
-    for (const e of completed) {
-      const t = new Date(e.start);
-      const idx =
-        unit === 'month'
-          ? (t.getFullYear() - from.getFullYear()) * 12 + (t.getMonth() - from.getMonth())
-          : Math.floor((startOfDay(t).getTime() - startOfDay(from).getTime()) / DAY_MS);
-      if (idx >= 0 && idx < list.length) list[idx].min += entryDurationMin(e);
-    }
-    return list;
   });
 
   let maxBucket = $derived(Math.max(0, ...buckets.map((b) => b.min)));
@@ -134,6 +170,50 @@
     const ticks = [];
     for (let v = 0; v <= max + 0.5; v += step) ticks.push(v);
     return { max, ticks };
+  });
+
+  /**
+   * The hovered bar's detail for the chart tooltip, or null when nothing is
+   * hovered: its date label, total, entry count, a small project breakdown, and
+   * the bar's height as a % of the axis so the tooltip can sit atop the bar.
+   * Height is capped so a near-full bar's tooltip stays inside the plot.
+   */
+  let hoveredDay = $derived.by(() => {
+    if (hoveredIdx == null) return null;
+    const b = buckets[hoveredIdx];
+    if (!b) return null;
+    const totals = new Map();
+    for (const e of b.entries) {
+      const key = e.projectId ?? NO_PROJECT;
+      totals.set(key, (totals.get(key) ?? 0) + entryDurationMin(e));
+    }
+    const projects = [...totals.entries()]
+      .map(([key, min]) => {
+        const project = key === NO_PROJECT ? null : store.projectsById.get(key);
+        return {
+          key,
+          name: project?.name ?? 'No project',
+          color: project?.color ?? 'var(--no-project)',
+          min,
+        };
+      })
+      .sort((a, b) => b.min - a.min);
+    const label =
+      range.unit === 'month'
+        ? b.start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+        : b.start.toLocaleDateString(undefined, {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+          });
+    return {
+      label,
+      min: b.min,
+      count: b.entries.length,
+      heightPct: Math.min(72, axis.max ? (b.min / axis.max) * 100 : 0),
+      projects: projects.slice(0, 4),
+      more: Math.max(0, projects.length - 4),
+    };
   });
 
   /** Compact duration for an axis tick: "0", "45m", "1h", "1h 30m". */
@@ -158,18 +238,6 @@
     }
     const day = bucket.start.getDate();
     return day === 1 || day % 5 === 0 ? String(day) : '';
-  }
-
-  function barTitle(bucket) {
-    const when =
-      range.unit === 'month'
-        ? bucket.start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-        : bucket.start.toLocaleDateString(undefined, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-          });
-    return `${when} · ${formatDuration(bucket.min)}`;
   }
 </script>
 
@@ -213,15 +281,63 @@
                   <div class="gridline" style:bottom="{(t / axis.max) * 100}%"></div>
                 {/each}
               </div>
-              <div class="bars">
-                {#each buckets as b (b.start.getTime())}
-                  <div class="bar-col" title={barTitle(b)}>
+              <div
+                class="bars"
+                class:focusing={hoveredIdx != null}
+                onmouseleave={() => (hoveredIdx = null)}
+                role="group"
+                aria-label="Tracked time per day; hover a bar to see that day's stats"
+              >
+                {#each buckets as b, i (b.start.getTime())}
+                  <div
+                    class="bar-col"
+                    class:hovered={hoveredIdx === i}
+                    role="button"
+                    tabindex="0"
+                    aria-label="{b.start.toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })} · {formatDuration(b.min)}"
+                    onmouseenter={() => (hoveredIdx = i)}
+                    onfocus={() => (hoveredIdx = i)}
+                    onblur={() => (hoveredIdx = null)}
+                  >
                     {#if b.min > 0}
                       <div class="bar-fill" style:height="{(b.min / axis.max) * 100}%"></div>
                     {/if}
                   </div>
                 {/each}
               </div>
+
+              {#if hoveredDay}
+                <div
+                  class="bar-tip"
+                  class:flip={(hoveredIdx ?? 0) > buckets.length / 2}
+                  style:left="{(((hoveredIdx ?? 0) + 0.5) / buckets.length) * 100}%"
+                  style:bottom="{hoveredDay.heightPct}%"
+                >
+                  <div class="tip-when">{hoveredDay.label}</div>
+                  <div class="tip-total">
+                    {formatDuration(hoveredDay.min)} · {hoveredDay.count}
+                    {hoveredDay.count === 1 ? 'entry' : 'entries'}
+                  </div>
+                  {#if hoveredDay.projects.length}
+                    <ul class="tip-projects">
+                      {#each hoveredDay.projects as p (p.key)}
+                        <li>
+                          <span class="legend-dot" style:background={p.color}></span>
+                          <span class="tip-name">{p.name}</span>
+                          <span class="tip-dur">{formatDuration(p.min)}</span>
+                        </li>
+                      {/each}
+                      {#if hoveredDay.more}
+                        <li class="tip-more">+{hoveredDay.more} more</li>
+                      {/if}
+                    </ul>
+                  {/if}
+                </div>
+              {/if}
             </div>
 
             <div class="x-axis">
@@ -260,13 +376,41 @@
                   <span class="legend-dot" style:background={p.color}></span>
                   <span class="legend-name">{p.name}</span>
                   <span class="legend-pct">{Math.round(p.pct)}%</span>
-                  <span class="legend-dur">{formatDuration(p.min)}</span>
                 </li>
               {/each}
             </ul>
           </div>
         </section>
       </div>
+
+      <section class="card table-card">
+        <h3>By project &amp; notes</h3>
+        <div class="table-scroll">
+          <table class="summary">
+            <thead>
+              <tr>
+                <th class="col-project">Project</th>
+                <th class="col-duration">Duration</th>
+                <th class="col-notes">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each projectRows as p (p.key)}
+                <tr>
+                  <td class="col-project">
+                    <span class="project-cell">
+                      <span class="legend-dot" style:background={p.color}></span>
+                      <span class="cell-name">{p.name}</span>
+                    </span>
+                  </td>
+                  <td class="col-duration">{formatDuration(p.min)}</td>
+                  <td class="col-notes">{p.notes || '—'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
     {/if}
   </div>
 </div>
@@ -386,6 +530,7 @@
     align-items: end;
     min-width: 0;
     height: 100%;
+    cursor: pointer;
   }
   .bar-fill {
     width: 100%;
@@ -393,7 +538,71 @@
     min-height: 2px;
     background: var(--accent);
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    transition: height 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      height 200ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 120ms ease;
+  }
+  /* While one bar is hovered, fade the rest so the focused day stands out. */
+  .bars.focusing .bar-col:not(.hovered) .bar-fill {
+    opacity: 0.4;
+  }
+
+  /* Floating per-day tooltip, anchored above the hovered bar. `left` is set
+     inline to the bar's centre; we translate back by half our width to centre
+     on it (or pull fully left, via .flip, for bars in the right half so the
+     card doesn't run off the plot's right edge). */
+  .bar-tip {
+    position: absolute;
+    z-index: 2;
+    transform: translate(-50%, 8px);
+    min-width: 150px;
+    max-width: 220px;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md, 0 4px 16px rgb(0 0 0 / 0.18));
+    pointer-events: none;
+    font-size: 12px;
+  }
+  .bar-tip.flip {
+    transform: translate(-100%, 8px);
+  }
+  .tip-when {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tip-total {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: var(--space-2);
+  }
+  .tip-projects {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .tip-projects li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .tip-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tip-dur {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .tip-more {
+    color: var(--muted);
   }
   .x-axis {
     grid-column: 2;
@@ -488,11 +697,56 @@
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .legend-dur {
+
+  /* Summary table: project + total duration + all notes for the range. */
+  .table-scroll {
+    overflow-x: auto;
+  }
+  .summary {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .summary th {
+    text-align: left;
     font-weight: 600;
+    color: var(--muted);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .summary td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--grid-line);
+    vertical-align: top;
+  }
+  .summary tbody tr:last-child td {
+    border-bottom: 1px solid var(--border);
+  }
+  .summary .col-project {
+    white-space: nowrap;
+  }
+  /* Inner wrapper keeps the dot + name on one line while the <td> stays a real
+     table-cell, so the column widths and the top-aligned rows line up. */
+  .project-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: 220px;
+  }
+  .summary .cell-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .summary .col-duration {
     font-variant-numeric: tabular-nums;
-    min-width: 64px;
-    text-align: right;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .summary .col-notes {
+    color: var(--muted);
+    line-height: 1.5;
+    min-width: 220px;
   }
 
   .empty {
